@@ -354,7 +354,7 @@ struct VariableIndexRecord {
     let recordSize: Int64
     let recordType: CDFRecordType
     let vxrNext: Int64       // Offset to next VXR
-    let nEntries: Int32      // Number of entries
+    let nEntries: Int32      // Number of entries allocated
     let nUsedEntries: Int32  // Number of used entries
     let entries: [(first: Int32, last: Int32, offset: Int64)]  // Record ranges and offsets
 
@@ -375,12 +375,32 @@ struct VariableIndexRecord {
         guard let nUsed = reader.readInt32() else { return nil }
         self.nUsedEntries = nUsed
 
-        var entries: [(Int32, Int32, Int64)] = []
-        for _ in 0..<nUsed {
+        // VXR stores arrays separately: First[nEntries], Last[nEntries], Offset[nEntries]
+        // Read all First values
+        var firsts: [Int32] = []
+        for _ in 0..<nEnt {
             guard let first = reader.readInt32() else { return nil }
+            firsts.append(first)
+        }
+
+        // Read all Last values
+        var lasts: [Int32] = []
+        for _ in 0..<nEnt {
             guard let last = reader.readInt32() else { return nil }
+            lasts.append(last)
+        }
+
+        // Read all Offset values
+        var offsets: [Int64] = []
+        for _ in 0..<nEnt {
             guard let offset = reader.readInt64() else { return nil }
-            entries.append((first, last, offset))
+            offsets.append(offset)
+        }
+
+        // Combine into entries (only used entries)
+        var entries: [(Int32, Int32, Int64)] = []
+        for i in 0..<Int(nUsed) {
+            entries.append((firsts[i], lasts[i], offsets[i]))
         }
         self.entries = entries
     }
@@ -415,7 +435,7 @@ struct VariableValuesRecord {
 struct CompressedVariableValuesRecord {
     let recordSize: Int64
     let recordType: CDFRecordType
-    let rfuA: Int64
+    let rfuA: Int32          // Reserved (4 bytes, not 8!)
     let compressedSize: Int64
 
     init?(reader: CDFBinaryReader) {
@@ -426,7 +446,7 @@ struct CompressedVariableValuesRecord {
               let type = CDFRecordType(rawValue: typeRaw) else { return nil }
         self.recordType = type
 
-        guard let rfu = reader.readInt64() else { return nil }
+        guard let rfu = reader.readInt32() else { return nil }  // 4 bytes, not 8!
         self.rfuA = rfu
 
         guard let cSize = reader.readInt64() else { return nil }
@@ -434,7 +454,7 @@ struct CompressedVariableValuesRecord {
     }
 
     var dataOffset: Int {
-        return 28 // Size (8) + Type (4) + RFU (8) + CompressedSize (8)
+        return 24 // Size (8) + Type (4) + RFU (4) + CompressedSize (8) = 24
     }
 }
 
