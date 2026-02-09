@@ -170,9 +170,16 @@ struct GlobeView: View {
                 }
             }
         .onAppear {
-            selectedPositionVariable = viewModel.cdfFile?.ecefPositionVariables().first
             if scene == nil {
                 scene = createInitialScene()
+            }
+            // Auto-select and load if there's only one position variable
+            if let file = viewModel.cdfFile {
+                let posVars = file.ecefPositionVariables()
+                selectedPositionVariable = posVars.first
+                if posVars.count == 1 {
+                    loadPositions()
+                }
             }
         }
         .onChange(of: animationProgress) {
