@@ -15,7 +15,13 @@ struct DataTableView: View {
     var body: some View {
         VStack(spacing: 0) {
             // Header with variable info
-            VariableHeaderView(variable: variable)
+            VariableHeaderView(variable: variable) { dependName in
+                // Navigate to the dependent variable
+                if let file = viewModel.cdfFile,
+                   let dependVar = file.variables.first(where: { $0.name == dependName }) {
+                    viewModel.selectedVariable = dependVar
+                }
+            }
 
             Divider()
 
@@ -113,6 +119,7 @@ struct DataTableView: View {
 
 struct VariableHeaderView: View {
     let variable: CDFVariable
+    var onDependsOnTapped: ((String) -> Void)?
 
     var body: some View {
         HStack {
@@ -131,14 +138,25 @@ struct VariableHeaderView: View {
 
             Spacer()
 
-            // Show DEPEND attribute if present
+            // Show DEPEND attribute if present - clickable to navigate
             if let depend = variable.dependsOn {
-                Text("Depends on: \(depend)")
+                Button {
+                    onDependsOnTapped?(depend)
+                } label: {
+                    HStack(spacing: 4) {
+                        Text("Depends on:")
+                            .foregroundStyle(.secondary)
+                        Text(depend)
+                            .foregroundStyle(.blue)
+                    }
                     .font(.caption)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
                     .background(.fill.quaternary)
                     .clipShape(Capsule())
+                }
+                .buttonStyle(.plain)
+                .help("Click to navigate to \(depend)")
             }
         }
         .padding(.horizontal)

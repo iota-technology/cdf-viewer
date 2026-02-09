@@ -12,7 +12,17 @@ struct GlobeView: View {
     @State private var animationProgress: Double = 1.0
     @State private var isAnimating = false
     @State private var scene: SCNScene?
-    @State private var lastTrackUpdateProgress: Double = 0.0
+    @State private var trackNode: SCNNode?
+    @State private var trackVertices: [SCNVector3] = []
+    @State private var speedMultiplier: Double = 600.0
+
+    private let speedOptions: [(label: String, value: Double)] = [
+        ("60×", 60),
+        ("300×", 300),
+        ("600×", 600),
+        ("1200×", 1200),
+        ("3600×", 3600)
+    ]
 
     // Scale factor: Earth radius ~6371 km, positions in meters
     private let earthRadiusKm: Double = 6371.0
@@ -54,28 +64,6 @@ struct GlobeView: View {
                     .buttonStyle(.borderedProminent)
                     .disabled(selectedPositionVariable == nil || isLoading)
 
-                    // Animation controls
-                    if !positions.isEmpty {
-                        GroupBox("Animation") {
-                            VStack(alignment: .leading, spacing: 8) {
-                                HStack {
-                                    Button(isAnimating ? "Stop" : "Play") {
-                                        toggleAnimation()
-                                    }
-                                    .buttonStyle(.bordered)
-
-                                    Button("Reset") {
-                                        animationProgress = 1.0
-                                        isAnimating = false
-                                    }
-                                    .buttonStyle(.bordered)
-                                }
-
-                                Slider(value: $animationProgress, in: 0...1)
-                            }
-                        }
-                    }
-
                     // Stats
                     if !positions.isEmpty {
                         GroupBox("Track Info") {
@@ -113,12 +101,63 @@ struct GlobeView: View {
                         )
                         .background(Color.black)
                         .overlay(alignment: .bottom) {
-                            if let currentDate = currentTimestamp {
-                                Text(currentDate, format: .dateTime.year().month().day().hour().minute())
-                                    .font(.system(size: 24, weight: .medium).monospacedDigit())
-                                    .foregroundStyle(.white)
-                                    .shadow(color: .black, radius: 2)
-                                    .padding(.bottom, 20)
+                            if !positions.isEmpty {
+                                // QuickTime-style scrubber overlay
+                                VStack(spacing: 8) {
+                                    // Timestamp display
+                                    if let currentDate = currentTimestamp {
+                                        Text(currentDate, format: .dateTime.year().month().day().hour().minute())
+                                            .font(.system(size: 18, weight: .medium).monospacedDigit())
+                                            .foregroundStyle(.white)
+                                            .shadow(color: .black, radius: 2)
+                                    }
+
+                                    // Scrubber controls
+                                    HStack(spacing: 12) {
+                                        // Play/Pause button
+                                        Button {
+                                            toggleAnimation()
+                                        } label: {
+                                            Image(systemName: isAnimating ? "pause.fill" : "play.fill")
+                                                .font(.title2)
+                                        }
+                                        .buttonStyle(.plain)
+                                        .foregroundStyle(.white)
+
+                                        // Scrubber slider
+                                        Slider(value: $animationProgress, in: 0...1)
+                                            .tint(.white)
+                                            .frame(minWidth: 200)
+
+                                        // Speed picker
+                                        Menu {
+                                            ForEach(speedOptions, id: \.value) { option in
+                                                Button {
+                                                    speedMultiplier = option.value
+                                                } label: {
+                                                    HStack {
+                                                        Text(option.label)
+                                                        if speedMultiplier == option.value {
+                                                            Image(systemName: "checkmark")
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        } label: {
+                                            Text(speedOptions.first { $0.value == speedMultiplier }?.label ?? "\(Int(speedMultiplier))×")
+                                                .font(.system(.body, design: .monospaced))
+                                                .foregroundStyle(.white)
+                                                .frame(width: 60)
+                                        }
+                                        .menuStyle(.borderlessButton)
+                                    }
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 10)
+                                    .background(.black.opacity(0.6))
+                                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                                }
+                                .padding(.bottom, 20)
+                                .padding(.horizontal, 20)
                             }
                         }
                     } else {
@@ -138,16 +177,12 @@ struct GlobeView: View {
         }
         .onChange(of: animationProgress) {
             updateMarkerPosition()
-            // Throttle track updates: only rebuild geometry every 2% progress change
-            if abs(animationProgress - lastTrackUpdateProgress) >= 0.02 || animationProgress >= 1.0 {
-                updateTrackLine()
-                lastTrackUpdateProgress = animationProgress
-            }
+            updateTrackProgress()
         }
         .onChange(of: positions.count) {
-            lastTrackUpdateProgress = 0.0
-            updateTrackLine()
+            createTrackGeometry()
             updateMarkerPosition()
+            updateTrackProgress()
         }
     }
 
@@ -203,21 +238,69 @@ struct GlobeView: View {
         return newScene
     }
 
-    /// Updates track line geometry based on current animation progress
-    private func updateTrackLine() {
-        guard let scene = scene else { return }
+    /// Creates the full track geometry - vertices are created once, indices updated per frame
+    private func createTrackGeometry() {
+        guard let scene = scene, positions.count > 1 else { return }
 
-        // Remove existing track node
+        // Remove existing track
         scene.rootNode.childNode(withName: "track", recursively: false)?.removeFromParentNode()
+        trackNode = nil
 
-        // Calculate visible positions based on animation progress
-        let visibleCount = max(1, Int(Double(positions.count) * animationProgress))
-        let visiblePositions = Array(positions.prefix(visibleCount))
+        // Cache vertices
+        trackVertices = positions.map { ecefToSceneKit($0.x, $0.y, $0.z) }
 
-        // Add track if we have enough positions
-        guard visiblePositions.count > 1 else { return }
+        // Create initial geometry with all segments visible
+        updateTrackGeometryElement()
+    }
 
-        addTrackLine(to: scene, positions: visiblePositions)
+    /// Updates the track by recreating geometry with current progress
+    /// This is fast because we reuse cached vertices
+    private func updateTrackProgress() {
+        updateTrackGeometryElement()
+    }
+
+    /// Creates/updates track geometry element based on current progress
+    private func updateTrackGeometryElement() {
+        guard let scene = scene, trackVertices.count > 1 else { return }
+
+        // Calculate how many segments to show
+        let visibleSegments = max(1, Int(Double(trackVertices.count - 1) * animationProgress))
+
+        // Create indices only for visible segments
+        var indices: [Int32] = []
+        indices.reserveCapacity(visibleSegments * 2)
+        for i in 0..<visibleSegments {
+            indices.append(Int32(i))
+            indices.append(Int32(i + 1))
+        }
+
+        let vertexSource = SCNGeometrySource(vertices: trackVertices)
+        let indexData = Data(bytes: indices, count: indices.count * MemoryLayout<Int32>.size)
+        let element = SCNGeometryElement(
+            data: indexData,
+            primitiveType: .line,
+            primitiveCount: visibleSegments,
+            bytesPerIndex: MemoryLayout<Int32>.size
+        )
+
+        let geometry = SCNGeometry(sources: [vertexSource], elements: [element])
+
+        // Material
+        let material = SCNMaterial()
+        material.diffuse.contents = NSColor.yellow
+        material.emission.contents = NSColor.yellow
+        material.lightingModel = .constant
+        geometry.materials = [material]
+
+        // Update or create node
+        if let existingNode = trackNode {
+            existingNode.geometry = geometry
+        } else {
+            let node = SCNNode(geometry: geometry)
+            node.name = "track"
+            scene.rootNode.addChildNode(node)
+            trackNode = node
+        }
     }
 
     /// Called during animation - only updates marker position (no geometry recreation)
@@ -247,37 +330,6 @@ struct GlobeView: View {
         }
         // Fallback to simple blue color if texture not found
         return NSColor(red: 0.1, green: 0.3, blue: 0.6, alpha: 1.0)
-    }
-
-    private func addTrackLine(to scene: SCNScene, positions: [(x: Double, y: Double, z: Double)]) {
-        var vertices: [SCNVector3] = []
-        var indices: [Int32] = []
-
-        for (index, pos) in positions.enumerated() {
-            let scenePos = ecefToSceneKit(pos.x, pos.y, pos.z)
-            vertices.append(scenePos)
-
-            if index > 0 {
-                indices.append(Int32(index - 1))
-                indices.append(Int32(index))
-            }
-        }
-
-        let vertexSource = SCNGeometrySource(vertices: vertices)
-        let indexData = Data(bytes: indices, count: indices.count * MemoryLayout<Int32>.size)
-        let element = SCNGeometryElement(data: indexData, primitiveType: .line, primitiveCount: indices.count / 2, bytesPerIndex: MemoryLayout<Int32>.size)
-
-        let geometry = SCNGeometry(sources: [vertexSource], elements: [element])
-
-        let material = SCNMaterial()
-        material.diffuse.contents = NSColor.yellow
-        material.emission.contents = NSColor.yellow
-        material.lightingModel = .constant
-        geometry.materials = [material]
-
-        let lineNode = SCNNode(geometry: geometry)
-        lineNode.name = "track"
-        scene.rootNode.addChildNode(lineNode)
     }
 
     private func addCurrentPositionMarker(to scene: SCNScene, position: (x: Double, y: Double, z: Double)) {
@@ -362,13 +414,30 @@ struct GlobeView: View {
         }
     }
 
+    /// Total duration of the track in seconds (from timestamps)
+    private var trackDuration: TimeInterval {
+        if timestamps.count >= 2,
+           let first = timestamps.first,
+           let last = timestamps.last {
+            return last.timeIntervalSince(first)
+        }
+        // Fallback: assume 90 minutes if no timestamps
+        return 90 * 60
+    }
+
     private func startAnimation() {
         guard isAnimating else { return }
 
+        let frameInterval: UInt64 = 16_000_000  // ~60fps in nanoseconds
+
         Task { @MainActor in
             while isAnimating && animationProgress < 1.0 {
-                try? await Task.sleep(nanoseconds: 16_000_000)  // ~60fps
-                animationProgress = min(1.0, animationProgress + 0.002)
+                try? await Task.sleep(nanoseconds: frameInterval)
+                // Recalculate each frame in case speed changed during animation
+                // At speedMultiplier×, animation completes in (trackDuration / speedMultiplier) seconds
+                let animationDuration = trackDuration / speedMultiplier
+                let progressPerFrame = 1.0 / (animationDuration * 60.0)  // 60 fps
+                animationProgress = min(1.0, animationProgress + progressPerFrame)
             }
             if animationProgress >= 1.0 {
                 isAnimating = false
