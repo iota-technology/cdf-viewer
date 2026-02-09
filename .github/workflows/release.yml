@@ -5,6 +5,9 @@ on:
     tags:
       - 'v*'
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: macos-14
@@ -64,8 +67,7 @@ jobs:
       - name: Create zip
         run: |
           cd CDFViewer/build/Export
-          zip -r ../../../CDFViewer-${{ steps.version.outputs.version }}.zip CDFViewer.app
-          cd ../../..
+          zip -r CDFViewer-${{ steps.version.outputs.version }}.zip CDFViewer.app
           ls -la CDFViewer-*.zip
 
       - name: Create GitHub Release
@@ -83,7 +85,7 @@ jobs:
             ### Requirements
             - macOS 14.0 (Sonoma) or later
           files: |
-            CDFViewer/CDFViewer-${{ steps.version.outputs.version }}.zip
+            CDFViewer/build/Export/CDFViewer-${{ steps.version.outputs.version }}.zip
           draft: false
           prerelease: false
         env:
