@@ -86,8 +86,7 @@ final class CDFFile: Identifiable {
         // 2D array with [rows, cols] shape: first dimension is rows, second is columns
         if variable.dimensions.count == 2 {
             let colsPerRow = variable.dimensions[1]
-            let rowCount = variable.dimensions[0] * variable.recordCount
-            let effectiveRange = range ?? (0..<rowCount)
+            let effectiveRange = range ?? (0..<variable.displayRowCount)
             var rows: [CDFDataRow] = []
 
             for rowIndex in effectiveRange {

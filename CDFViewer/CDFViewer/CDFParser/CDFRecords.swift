@@ -397,6 +397,9 @@ struct VariableIndexRecord {
             offsets.append(offset)
         }
 
+        // Validate that used entries count doesn't exceed allocated entries
+        guard nUsed <= nEnt else { return nil }
+
         // Combine into entries (only used entries)
         var entries: [(Int32, Int32, Int64)] = []
         for i in 0..<Int(nUsed) {
@@ -446,7 +449,7 @@ struct CompressedVariableValuesRecord {
               let type = CDFRecordType(rawValue: typeRaw) else { return nil }
         self.recordType = type
 
-        guard let rfu = reader.readInt32() else { return nil }  // 4 bytes, not 8!
+        guard let rfu = reader.readInt32() else { return nil }
         self.rfuA = rfu
 
         guard let cSize = reader.readInt64() else { return nil }

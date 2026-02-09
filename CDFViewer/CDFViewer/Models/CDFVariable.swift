@@ -27,16 +27,28 @@ struct CDFVariable: Identifiable, Hashable {
         return maxRecord + 1
     }
 
-    /// Whether this is a single-record variable with a 1D array dimension
-    /// In this case, we display dimension elements as rows rather than records
+    /// Whether this is a single-record variable with a 1D array dimension.
+    /// In this case, we display dimension elements as rows rather than records.
+    /// The threshold of > 3 distinguishes actual arrays from 3-vectors which
+    /// should be displayed as X/Y/Z columns rather than separate rows.
     var isSingleRecordArray: Bool {
         return maxRecord == 0 && dimensions.count == 1 && dimensions[0] > 3
     }
 
-    /// Effective row count for display (accounts for single-record arrays)
+    /// Whether each CDF record contains multiple displayable rows.
+    /// This is true for 2D arrays like [N, 3] where N elements per record
+    /// should each become a separate display row with 3 columns.
+    var hasMultipleRowsPerRecord: Bool {
+        return dimensions.count == 2 && dimensions[0] > 1
+    }
+
+    /// Effective row count for display (accounts for arrays stored as single records)
     var displayRowCount: Int {
         if isSingleRecordArray {
             return dimensions[0]
+        }
+        if hasMultipleRowsPerRecord {
+            return dimensions[0] * recordCount
         }
         return recordCount
     }
