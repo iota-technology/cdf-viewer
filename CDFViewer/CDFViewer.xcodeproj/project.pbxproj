@@ -24,6 +24,7 @@
 		A1000015000000000000000F /* VectorInspectorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000015000000000000000F /* VectorInspectorView.swift */; };
 		A10000160000000000000010 /* TimeSeriesChartView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000160000000000000010 /* TimeSeriesChartView.swift */; };
 		A10000170000000000000011 /* GlobeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000170000000000000011 /* GlobeView.swift */; };
+		A10000180000000000000012 /* blue_marble.jpg in Resources */ = {isa = PBXBuildFile; fileRef = A20000180000000000000012 /* blue_marble.jpg */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -45,6 +46,7 @@
 		A2000015000000000000000F /* VectorInspectorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VectorInspectorView.swift; sourceTree = "<group>"; };
 		A20000160000000000000010 /* TimeSeriesChartView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeSeriesChartView.swift; sourceTree = "<group>"; };
 		A20000170000000000000011 /* GlobeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlobeView.swift; sourceTree = "<group>"; };
+		A20000180000000000000012 /* blue_marble.jpg */ = {isa = PBXFileReference; lastKnownFileType = image.jpeg; path = blue_marble.jpg; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -74,6 +76,7 @@
 				A40000060000000000000006 /* Models */,
 				A40000070000000000000007 /* Views */,
 				A40000080000000000000008 /* ViewModels */,
+				A40000090000000000000009 /* Resources */,
 			);
 			path = CDFViewer;
 			sourceTree = "<group>";
@@ -138,6 +141,14 @@
 			path = ViewModels;
 			sourceTree = "<group>";
 		};
+		A40000090000000000000009 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				A20000180000000000000012 /* blue_marble.jpg */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -147,6 +158,7 @@
 			buildPhases = (
 				A70000010000000000000001 /* Sources */,
 				A30000010000000000000001 /* Frameworks */,
+				A70000020000000000000002 /* Resources */,
 			);
 			buildRules = (
 			);
@@ -216,6 +228,17 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXResourcesBuildPhase section */
+		A70000020000000000000002 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A10000180000000000000012 /* blue_marble.jpg in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
 
 /* Begin XCBuildConfiguration section */
 		A90000010000000000000001 /* Debug */ = {

@@ -3,7 +3,6 @@ import Charts
 
 struct TimeSeriesChartView: View {
     @Bindable var viewModel: CDFViewModel
-    @Environment(\.dismiss) private var dismiss
 
     @State private var selectedTimeVariable: CDFVariable?
     @State private var selectedYVariables: Set<CDFVariable> = []
@@ -14,25 +13,7 @@ struct TimeSeriesChartView: View {
     @State private var hoveredPoint: ChartDataPoint?
 
     var body: some View {
-        VStack(spacing: 0) {
-            // Header
-            HStack {
-                Text("Time Series Chart")
-                    .font(.headline)
-
-                Spacer()
-
-                Button("Done") {
-                    dismiss()
-                }
-                .keyboardShortcut(.escape, modifiers: [])
-            }
-            .padding()
-            .background(.bar)
-
-            Divider()
-
-            HSplitView {
+        HSplitView {
                 // Variable selection sidebar
                 VStack(alignment: .leading, spacing: 16) {
                     // Time variable selector
@@ -130,7 +111,6 @@ struct TimeSeriesChartView: View {
                     }
                 }
             }
-        }
         .onAppear {
             selectedTimeVariable = viewModel.chartTimeVariable
         }

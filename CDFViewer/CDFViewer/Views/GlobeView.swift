@@ -3,7 +3,6 @@ import SceneKit
 
 struct GlobeView: View {
     @Bindable var viewModel: CDFViewModel
-    @Environment(\.dismiss) private var dismiss
 
     @State private var selectedPositionVariable: CDFVariable?
     @State private var positions: [(x: Double, y: Double, z: Double)] = []
@@ -19,25 +18,7 @@ struct GlobeView: View {
     private let metersToSceneUnits: Double = 1.0 / 1_000_000.0  // 1 scene unit = 1000 km
 
     var body: some View {
-        VStack(spacing: 0) {
-            // Header
-            HStack {
-                Text("3D Globe View")
-                    .font(.headline)
-
-                Spacer()
-
-                Button("Done") {
-                    dismiss()
-                }
-                .keyboardShortcut(.escape, modifiers: [])
-            }
-            .padding()
-            .background(.bar)
-
-            Divider()
-
-            HSplitView {
+        HSplitView {
                 // Controls sidebar
                 VStack(alignment: .leading, spacing: 16) {
                     // Position variable selector
@@ -140,7 +121,6 @@ struct GlobeView: View {
                     }
                 }
             }
-        }
         .onAppear {
             selectedPositionVariable = viewModel.cdfFile?.ecefPositionVariables().first
         }
@@ -214,74 +194,14 @@ struct GlobeView: View {
         return scene
     }
 
-    private func createEarthTexture() -> NSImage {
-        // Create a simple Earth-like texture with continents
-        // In a real app, you'd load a high-res texture file
-        let size = NSSize(width: 1024, height: 512)
-        let image = NSImage(size: size)
-
-        image.lockFocus()
-
-        // Ocean blue
-        NSColor(red: 0.1, green: 0.2, blue: 0.5, alpha: 1.0).setFill()
-        NSRect(origin: .zero, size: size).fill()
-
-        // Simple continent shapes (rough approximations)
-        NSColor(red: 0.2, green: 0.5, blue: 0.2, alpha: 1.0).setFill()
-
-        // North America
-        let na = NSBezierPath()
-        na.move(to: NSPoint(x: 100, y: 350))
-        na.line(to: NSPoint(x: 200, y: 400))
-        na.line(to: NSPoint(x: 280, y: 350))
-        na.line(to: NSPoint(x: 250, y: 280))
-        na.line(to: NSPoint(x: 150, y: 250))
-        na.close()
-        na.fill()
-
-        // South America
-        let sa = NSBezierPath()
-        sa.move(to: NSPoint(x: 220, y: 200))
-        sa.line(to: NSPoint(x: 280, y: 220))
-        sa.line(to: NSPoint(x: 260, y: 100))
-        sa.line(to: NSPoint(x: 220, y: 50))
-        sa.line(to: NSPoint(x: 200, y: 120))
-        sa.close()
-        sa.fill()
-
-        // Europe/Africa
-        let af = NSBezierPath()
-        af.move(to: NSPoint(x: 480, y: 350))
-        af.line(to: NSPoint(x: 560, y: 380))
-        af.line(to: NSPoint(x: 580, y: 300))
-        af.line(to: NSPoint(x: 540, y: 150))
-        af.line(to: NSPoint(x: 480, y: 180))
-        af.line(to: NSPoint(x: 460, y: 280))
-        af.close()
-        af.fill()
-
-        // Asia
-        let asia = NSBezierPath()
-        asia.move(to: NSPoint(x: 580, y: 380))
-        asia.line(to: NSPoint(x: 800, y: 400))
-        asia.line(to: NSPoint(x: 850, y: 320))
-        asia.line(to: NSPoint(x: 750, y: 280))
-        asia.line(to: NSPoint(x: 650, y: 300))
-        asia.close()
-        asia.fill()
-
-        // Australia
-        let aus = NSBezierPath()
-        aus.move(to: NSPoint(x: 800, y: 150))
-        aus.line(to: NSPoint(x: 880, y: 160))
-        aus.line(to: NSPoint(x: 870, y: 100))
-        aus.line(to: NSPoint(x: 800, y: 90))
-        aus.close()
-        aus.fill()
-
-        image.unlockFocus()
-
-        return image
+    private func createEarthTexture() -> Any {
+        // Load NASA Blue Marble texture
+        if let url = Bundle.main.url(forResource: "blue_marble", withExtension: "jpg"),
+           let image = NSImage(contentsOf: url) {
+            return image
+        }
+        // Fallback to simple blue color if texture not found
+        return NSColor(red: 0.1, green: 0.3, blue: 0.6, alpha: 1.0)
     }
 
     private func addTrackLine(to scene: SCNScene, positions: [(x: Double, y: Double, z: Double)]) {

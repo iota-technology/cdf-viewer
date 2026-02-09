@@ -3,9 +3,10 @@ import SwiftUI
 struct ContentView: View {
     @Binding var document: CDFDocument
     @State private var viewModel = CDFViewModel()
+    @State private var documentID = UUID()
     @State private var showFileInfo = false
-    @State private var showChart = false
-    @State private var showGlobe = false
+    @Environment(ViewModelRegistry.self) private var registry
+    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         NavigationSplitView {
@@ -35,7 +36,12 @@ struct ContentView: View {
                 }
                 // Auto-detect time variable
                 viewModel.chartTimeVariable = file.timestampVariables().first
+                // Register viewModel for auxiliary windows
+                registry.register(viewModel, for: documentID)
             }
+        }
+        .onDisappear {
+            registry.unregister(documentID)
         }
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
@@ -54,29 +60,21 @@ struct ContentView: View {
 
                 Divider()
 
-                // Chart button
+                // Chart button - opens separate window
                 Button {
-                    showChart.toggle()
+                    openWindow(id: "Time Series Chart", value: documentID)
                 } label: {
                     Label("Chart", systemImage: "chart.xyaxis.line")
                 }
                 .disabled(viewModel.chartTimeVariable == nil)
-                .sheet(isPresented: $showChart) {
-                    TimeSeriesChartView(viewModel: viewModel)
-                        .frame(minWidth: 800, minHeight: 600)
-                }
 
-                // Globe button
+                // Globe button - opens separate window
                 Button {
-                    showGlobe.toggle()
+                    openWindow(id: "3D Globe", value: documentID)
                 } label: {
                     Label("Globe", systemImage: "globe")
                 }
                 .disabled(document.cdfFile?.ecefPositionVariables().isEmpty ?? true)
-                .sheet(isPresented: $showGlobe) {
-                    GlobeView(viewModel: viewModel)
-                        .frame(minWidth: 800, minHeight: 600)
-                }
             }
 
             ToolbarItem(placement: .secondaryAction) {
