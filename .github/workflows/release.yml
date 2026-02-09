@@ -1,0 +1,90 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    runs-on: macos-14
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Extract version from tag
+        id: version
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Building version $VERSION"
+
+      - name: Update version in Xcode project
+        run: |
+          cd CDFViewer
+          # Update marketing version (e.g., 1.0.0)
+          sed -i '' "s/MARKETING_VERSION = [^;]*/MARKETING_VERSION = ${{ steps.version.outputs.version }}/" CDFViewer.xcodeproj/project.pbxproj
+          # Update build number using run number for uniqueness
+          sed -i '' "s/CURRENT_PROJECT_VERSION = [^;]*/CURRENT_PROJECT_VERSION = ${{ github.run_number }}/" CDFViewer.xcodeproj/project.pbxproj
+
+      - name: Build app
+        run: |
+          cd CDFViewer
+          xcodebuild -scheme CDFViewer \
+            -configuration Release \
+            -derivedDataPath build \
+            -archivePath build/CDFViewer.xcarchive \
+            archive \
+            CODE_SIGN_IDENTITY="-" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Export app from archive
+        run: |
+          cd CDFViewer
+          # Create export options plist for unsigned app
+          cat > ExportOptions.plist << EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key>
+            <string>mac-application</string>
+            <key>signingStyle</key>
+            <string>automatic</string>
+          </dict>
+          </plist>
+          EOF
+
+          # Copy app from archive (simpler than export for unsigned apps)
+          mkdir -p build/Export
+          cp -R build/CDFViewer.xcarchive/Products/Applications/CDFViewer.app build/Export/
+
+      - name: Create zip
+        run: |
+          cd CDFViewer/build/Export
+          zip -r ../../../CDFViewer-${{ steps.version.outputs.version }}.zip CDFViewer.app
+          cd ../../..
+          ls -la CDFViewer-*.zip
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: CDF Viewer v${{ steps.version.outputs.version }}
+          body: |
+            ## CDF Viewer v${{ steps.version.outputs.version }}
+
+            ### Installation
+            1. Download `CDFViewer-${{ steps.version.outputs.version }}.zip`
+            2. Unzip and drag `CDFViewer.app` to your Applications folder
+            3. On first launch, right-click the app and select "Open" to bypass Gatekeeper
+
+            ### Requirements
+            - macOS 14.0 (Sonoma) or later
+          files: |
+            CDFViewer/CDFViewer-${{ steps.version.outputs.version }}.zip
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
