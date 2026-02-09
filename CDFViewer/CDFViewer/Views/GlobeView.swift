@@ -184,6 +184,14 @@ struct GlobeView: View {
             updateMarkerPosition()
             updateTrackProgress()
         }
+        .onKeyPress(.space) {
+            if !positions.isEmpty {
+                toggleAnimation()
+                return .handled
+            }
+            return .ignored
+        }
+        .focusable()
     }
 
     // MARK: - Scene Creation
@@ -409,7 +417,10 @@ struct GlobeView: View {
         isAnimating.toggle()
 
         if isAnimating {
-            animationProgress = 0
+            // If at the end, restart from beginning
+            if animationProgress >= 1.0 {
+                animationProgress = 0
+            }
             startAnimation()
         }
     }
