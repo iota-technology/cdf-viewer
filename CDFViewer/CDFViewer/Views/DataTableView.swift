@@ -235,18 +235,19 @@ struct ErrorBanner: View {
 }
 
 #Preview {
-    let variable = CDFVariable(
-        name: "r_ecef",
-        dataType: .double,
-        numElements: 1,
-        dimensions: [86400, 3],
-        dimVarys: [true, true],
-        maxRecord: 0,
-        isZVariable: true,
-        vxrOffset: 0,
-        cprOffset: 0,
-        attributes: [:]
+    DataTableView(
+        viewModel: CDFViewModel(),
+        variable: CDFVariable(
+            name: "r_ecef",
+            dataType: .double,
+            numElements: 1,
+            dimensions: [86400, 3],
+            dimVarys: [true, true],
+            maxRecord: 0,
+            isZVariable: true,
+            vxrOffset: 0,
+            cprOffset: 0,
+            attributes: [:]
+        )
     )
-
-    DataTableView(viewModel: CDFViewModel(), variable: variable)
 }
