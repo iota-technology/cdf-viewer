@@ -84,10 +84,28 @@ struct CDFVariable: Identifiable, Hashable {
         return lowerName.contains("ecef") && (lowerName.contains("v_") || lowerName.contains("vel") || lowerName.hasPrefix("v"))
     }
 
-    /// Whether this appears to be a timestamp
+    /// Whether this appears to be a timestamp variable.
+    /// Uses specific patterns to avoid false positives on variables like "ontime", "runtime", etc.
     var isTimestamp: Bool {
+        // Always true for time data types (EPOCH, EPOCH16, TT2000)
+        if dataType.isTimeType {
+            return true
+        }
+
         let lowerName = name.lowercased()
-        return lowerName.contains("timestamp") || lowerName.contains("time") || dataType.isTimeType
+        // Check for "timestamp" anywhere
+        if lowerName.contains("timestamp") {
+            return true
+        }
+        // Check for names starting with "time" (e.g., "time", "time_utc", "time_gps")
+        if lowerName.hasPrefix("time") {
+            return true
+        }
+        // Check for "_time" suffix (e.g., "utc_time", "gps_time")
+        if lowerName.hasSuffix("_time") {
+            return true
+        }
+        return false
     }
 
     /// Dimension string for display (e.g., "[86400, 3]")

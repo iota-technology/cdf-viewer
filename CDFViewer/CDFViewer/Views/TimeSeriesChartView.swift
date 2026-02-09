@@ -51,29 +51,38 @@ struct TimeSeriesChartView: View {
                     // Y variable selector
                     GroupBox("Data Variables (Y-Axis)") {
                         if let file = viewModel.cdfFile {
-                            ScrollView {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    ForEach(file.numericVariables()) { variable in
-                                        Toggle(isOn: Binding(
-                                            get: { selectedYVariables.contains(variable) },
-                                            set: { isSelected in
-                                                if isSelected {
-                                                    selectedYVariables.insert(variable)
-                                                } else {
-                                                    selectedYVariables.remove(variable)
+                            let numericVars = file.numericVariables()
+                            if numericVars.isEmpty {
+                                Text("No numeric variables")
+                                    .foregroundStyle(.secondary)
+                                    .frame(maxWidth: .infinity, alignment: .center)
+                            } else {
+                                ScrollView {
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        ForEach(numericVars) { variable in
+                                            Toggle(isOn: Binding(
+                                                get: { selectedYVariables.contains(variable) },
+                                                set: { isSelected in
+                                                    if isSelected {
+                                                        selectedYVariables.insert(variable)
+                                                    } else {
+                                                        selectedYVariables.remove(variable)
+                                                    }
+                                                }
+                                            )) {
+                                                VStack(alignment: .leading) {
+                                                    Text(variable.name)
+                                                    Text(variable.typeString)
+                                                        .font(.caption)
+                                                        .foregroundStyle(.secondary)
                                                 }
                                             }
-                                        )) {
-                                            VStack(alignment: .leading) {
-                                                Text(variable.name)
-                                                Text(variable.typeString)
-                                                    .font(.caption)
-                                                    .foregroundStyle(.secondary)
-                                            }
+                                            .toggleStyle(.checkbox)
                                         }
-                                        .toggleStyle(.checkbox)
                                     }
+                                    .padding(.vertical, 4)
                                 }
+                                .frame(minHeight: 150, maxHeight: 300)
                             }
                         }
                     }
