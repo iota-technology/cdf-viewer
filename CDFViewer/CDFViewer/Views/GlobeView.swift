@@ -8,8 +8,6 @@ struct GlobeView: View {
     @State private var positions: [(x: Double, y: Double, z: Double)] = []
     @State private var isLoading = false
     @State private var errorMessage: String?
-    @State private var showTrack = true
-    @State private var showPoints = true
     @State private var animationProgress: Double = 1.0
     @State private var isAnimating = false
 
@@ -45,16 +43,6 @@ struct GlobeView: View {
                     }
                     .buttonStyle(.borderedProminent)
                     .disabled(selectedPositionVariable == nil || isLoading)
-
-                    Divider()
-
-                    // Display options
-                    GroupBox("Display Options") {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Toggle("Show Track Line", isOn: $showTrack)
-                            Toggle("Show Points", isOn: $showPoints)
-                        }
-                    }
 
                     // Animation controls
                     if !positions.isEmpty {
@@ -154,12 +142,8 @@ struct GlobeView: View {
             let visibleCount = Int(Double(positions.count) * animationProgress)
             let visiblePositions = Array(positions.prefix(visibleCount))
 
-            if showTrack && visiblePositions.count > 1 {
+            if visiblePositions.count > 1 {
                 addTrackLine(to: scene, positions: visiblePositions)
-            }
-
-            if showPoints {
-                addTrackPoints(to: scene, positions: visiblePositions)
             }
 
             // Current position marker
@@ -233,26 +217,6 @@ struct GlobeView: View {
         let lineNode = SCNNode(geometry: geometry)
         lineNode.name = "track"
         scene.rootNode.addChildNode(lineNode)
-    }
-
-    private func addTrackPoints(to scene: SCNScene, positions: [(x: Double, y: Double, z: Double)]) {
-        // Add points every N positions to avoid too many objects
-        let step = max(1, positions.count / 100)
-
-        for (index, pos) in positions.enumerated() where index % step == 0 {
-            let scenePos = ecefToSceneKit(pos.x, pos.y, pos.z)
-
-            let pointGeometry = SCNSphere(radius: 0.02)
-            let material = SCNMaterial()
-            material.diffuse.contents = NSColor.cyan
-            material.emission.contents = NSColor.cyan.withAlphaComponent(0.5)
-            pointGeometry.materials = [material]
-
-            let pointNode = SCNNode(geometry: pointGeometry)
-            pointNode.position = scenePos
-            pointNode.name = "point_\(index)"
-            scene.rootNode.addChildNode(pointNode)
-        }
     }
 
     private func addCurrentPositionMarker(to scene: SCNScene, position: (x: Double, y: Double, z: Double)) {
