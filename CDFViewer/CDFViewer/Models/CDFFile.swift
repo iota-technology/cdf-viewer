@@ -128,21 +128,37 @@ final class CDFFile: Identifiable {
     /// Read timestamps as Unix seconds
     func readTimestamps(for variable: CDFVariable) throws -> [Double] {
         let values = try readData(for: variable)
+
+        // CDF EPOCH offset: milliseconds from year 0 AD to Unix epoch (1970)
+        let epochToUnixMs = 62167219200000.0
+        // J2000 in Unix time (2000-01-01 12:00:00 TT)
+        let j2000Unix = 946728000.0
+
         return values.compactMap { value -> Double? in
             switch value {
-            case .int64(let v):
-                // Assume milliseconds since Unix epoch
-                return Double(v) / 1000.0
-            case .timeTT2000(let v):
-                // Nanoseconds since J2000
-                let j2000Unix = 946728000.0
-                return j2000Unix + Double(v) / 1e9
             case .epoch(let v):
-                // Milliseconds since 0 AD
-                let epochToUnix = 62167219200000.0
-                return (v - epochToUnix) / 1000.0
+                // CDF_EPOCH: milliseconds since 0 AD
+                return (v - epochToUnixMs) / 1000.0
+
+            case .epoch16(let v, _):
+                // CDF_EPOCH16: first double is milliseconds since 0 AD
+                return (v - epochToUnixMs) / 1000.0
+
+            case .timeTT2000(let v):
+                // CDF_TIME_TT2000: nanoseconds since J2000
+                return j2000Unix + Double(v) / 1e9
+
             case .float64(let v):
+                // Regular double - assume Unix seconds
                 return v
+
+            case .float32(let v):
+                return Double(v)
+
+            case .int64(let v):
+                // Regular int64 - assume milliseconds since Unix epoch
+                return Double(v) / 1000.0
+
             default:
                 return nil
             }

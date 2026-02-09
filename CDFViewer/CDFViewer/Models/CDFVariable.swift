@@ -185,11 +185,22 @@ struct CDFColumn: Identifiable {
     let dataType: CDFDataType
     let width: CGFloat
 
+    /// Appropriate column width based on data type
+    static func widthForDataType(_ dataType: CDFDataType) -> CGFloat {
+        if dataType.isTimeType {
+            // ISO8601 timestamps with fractional seconds need more space
+            return 220
+        }
+        return 150
+    }
+
     static func columnsForVariable(_ variable: CDFVariable) -> [CDFColumn] {
+        let width = widthForDataType(variable.dataType)
+
         // Single record with 1D array: dimension elements become rows, single value column
         if variable.isSingleRecordArray {
             return [
-                CDFColumn(id: 0, name: variable.name, dataType: variable.dataType, width: 150)
+                CDFColumn(id: 0, name: variable.name, dataType: variable.dataType, width: width)
             ]
         }
 
@@ -214,14 +225,14 @@ struct CDFColumn: Identifiable {
         // Scalar or single-element dimension
         if variable.dimensions.isEmpty || variable.dimensions == [1] {
             return [
-                CDFColumn(id: 0, name: variable.name, dataType: variable.dataType, width: 150)
+                CDFColumn(id: 0, name: variable.name, dataType: variable.dataType, width: width)
             ]
         }
 
         // Multi-dimensional - last dimension becomes columns
         let count = variable.dimensions.last ?? 1
         return (0..<count).map { i in
-            CDFColumn(id: i, name: "[\(i)]", dataType: variable.dataType, width: 100)
+            CDFColumn(id: i, name: "[\(i)]", dataType: variable.dataType, width: width)
         }
     }
 }

@@ -6,14 +6,24 @@ struct GlobeView: View {
 
     @State private var selectedPositionVariable: CDFVariable?
     @State private var positions: [(x: Double, y: Double, z: Double)] = []
+    @State private var timestamps: [Date] = []
     @State private var isLoading = false
     @State private var errorMessage: String?
     @State private var animationProgress: Double = 1.0
     @State private var isAnimating = false
+    @State private var scene: SCNScene?
+    @State private var lastTrackUpdateProgress: Double = 0.0
 
     // Scale factor: Earth radius ~6371 km, positions in meters
     private let earthRadiusKm: Double = 6371.0
     private let metersToSceneUnits: Double = 1.0 / 1_000_000.0  // 1 scene unit = 1000 km
+
+    /// Current timestamp based on animation progress
+    private var currentTimestamp: Date? {
+        guard !timestamps.isEmpty else { return nil }
+        let index = max(0, Int(Double(timestamps.count - 1) * animationProgress))
+        return timestamps[index]
+    }
 
     var body: some View {
         HSplitView {
@@ -62,10 +72,6 @@ struct GlobeView: View {
                                 }
 
                                 Slider(value: $animationProgress, in: 0...1)
-
-                                Text("\(Int(animationProgress * 100))% of track")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
                             }
                         }
                     }
@@ -100,30 +106,61 @@ struct GlobeView: View {
                             systemImage: "exclamationmark.triangle",
                             description: Text(error)
                         )
-                    } else {
+                    } else if let scene = scene {
                         SceneView(
-                            scene: createScene(),
+                            scene: scene,
                             options: [.allowsCameraControl, .autoenablesDefaultLighting]
                         )
                         .background(Color.black)
+                        .overlay(alignment: .bottom) {
+                            if let currentDate = currentTimestamp {
+                                Text(currentDate, format: .dateTime.year().month().day().hour().minute())
+                                    .font(.system(size: 24, weight: .medium).monospacedDigit())
+                                    .foregroundStyle(.white)
+                                    .shadow(color: .black, radius: 2)
+                                    .padding(.bottom, 20)
+                            }
+                        }
+                    } else {
+                        ContentUnavailableView(
+                            "No Track Loaded",
+                            systemImage: "globe",
+                            description: Text("Select a position variable and click Load Track")
+                        )
                     }
                 }
             }
         .onAppear {
             selectedPositionVariable = viewModel.cdfFile?.ecefPositionVariables().first
+            if scene == nil {
+                scene = createInitialScene()
+            }
+        }
+        .onChange(of: animationProgress) {
+            updateMarkerPosition()
+            // Throttle track updates: only rebuild geometry every 2% progress change
+            if abs(animationProgress - lastTrackUpdateProgress) >= 0.02 || animationProgress >= 1.0 {
+                updateTrackLine()
+                lastTrackUpdateProgress = animationProgress
+            }
+        }
+        .onChange(of: positions.count) {
+            lastTrackUpdateProgress = 0.0
+            updateTrackLine()
+            updateMarkerPosition()
         }
     }
 
     // MARK: - Scene Creation
 
-    private func createScene() -> SCNScene {
-        let scene = SCNScene()
+    private func createInitialScene() -> SCNScene {
+        let newScene = SCNScene()
 
         // Background
-        scene.background.contents = NSColor.black
+        newScene.background.contents = NSColor.black
 
         // Earth sphere
-        let earthRadius = earthRadiusKm * metersToSceneUnits * 1000  // Convert to scene units
+        let earthRadius = earthRadiusKm * metersToSceneUnits * 1000
         let earthGeometry = SCNSphere(radius: CGFloat(earthRadius))
 
         // Earth material with texture
@@ -135,36 +172,23 @@ struct GlobeView: View {
 
         let earthNode = SCNNode(geometry: earthGeometry)
         earthNode.name = "earth"
-        scene.rootNode.addChildNode(earthNode)
-
-        // Add satellite track if we have positions
-        if !positions.isEmpty {
-            let visibleCount = Int(Double(positions.count) * animationProgress)
-            let visiblePositions = Array(positions.prefix(visibleCount))
-
-            if visiblePositions.count > 1 {
-                addTrackLine(to: scene, positions: visiblePositions)
-            }
-
-            // Current position marker
-            if let current = visiblePositions.last {
-                addCurrentPositionMarker(to: scene, position: current)
-            }
-        }
+        newScene.rootNode.addChildNode(earthNode)
 
         // Camera
         let cameraNode = SCNNode()
         cameraNode.camera = SCNCamera()
         cameraNode.camera?.zFar = 1000
         cameraNode.position = SCNVector3(x: 0, y: 0, z: earthRadius * 3)
-        scene.rootNode.addChildNode(cameraNode)
+        cameraNode.name = "camera"
+        newScene.rootNode.addChildNode(cameraNode)
 
         // Ambient light
         let ambientLight = SCNNode()
         ambientLight.light = SCNLight()
         ambientLight.light?.type = .ambient
         ambientLight.light?.intensity = 300
-        scene.rootNode.addChildNode(ambientLight)
+        ambientLight.name = "ambientLight"
+        newScene.rootNode.addChildNode(ambientLight)
 
         // Directional light (sun)
         let sunLight = SCNNode()
@@ -173,9 +197,46 @@ struct GlobeView: View {
         sunLight.light?.intensity = 1000
         sunLight.position = SCNVector3(x: 100, y: 100, z: 100)
         sunLight.look(at: SCNVector3(0, 0, 0))
-        scene.rootNode.addChildNode(sunLight)
+        sunLight.name = "sunLight"
+        newScene.rootNode.addChildNode(sunLight)
 
-        return scene
+        return newScene
+    }
+
+    /// Updates track line geometry based on current animation progress
+    private func updateTrackLine() {
+        guard let scene = scene else { return }
+
+        // Remove existing track node
+        scene.rootNode.childNode(withName: "track", recursively: false)?.removeFromParentNode()
+
+        // Calculate visible positions based on animation progress
+        let visibleCount = max(1, Int(Double(positions.count) * animationProgress))
+        let visiblePositions = Array(positions.prefix(visibleCount))
+
+        // Add track if we have enough positions
+        guard visiblePositions.count > 1 else { return }
+
+        addTrackLine(to: scene, positions: visiblePositions)
+    }
+
+    /// Called during animation - only updates marker position (no geometry recreation)
+    private func updateMarkerPosition() {
+        guard let scene = scene, !positions.isEmpty else { return }
+
+        // Calculate which position to show
+        let index = max(0, Int(Double(positions.count - 1) * animationProgress))
+        let currentPos = positions[index]
+        let scenePos = ecefToSceneKit(currentPos.x, currentPos.y, currentPos.z)
+
+        // Get or create marker node
+        if let markerNode = scene.rootNode.childNode(withName: "current", recursively: false) {
+            // Just update position - no node recreation
+            markerNode.position = scenePos
+        } else {
+            // Create marker if it doesn't exist
+            addCurrentPositionMarker(to: scene, position: currentPos)
+        }
     }
 
     private func createEarthTexture() -> Any {
@@ -267,10 +328,20 @@ struct GlobeView: View {
         isLoading = true
         errorMessage = nil
         positions = []
+        timestamps = []
 
         Task { @MainActor in
             do {
                 positions = try file.readECEFPositions(for: posVar)
+
+                // Try to load corresponding timestamps
+                if let timeVar = file.timestampVariables().first {
+                    let timeValues = try file.readTimestamps(for: timeVar)
+                    // Convert to Dates, matching position count
+                    let count = min(timeValues.count, positions.count)
+                    timestamps = timeValues.prefix(count).map { Date(timeIntervalSince1970: $0) }
+                }
+
                 animationProgress = 1.0
                 isLoading = false
             } catch {
