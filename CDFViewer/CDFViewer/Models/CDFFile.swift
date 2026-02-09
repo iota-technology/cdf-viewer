@@ -21,14 +21,14 @@ final class CDFFile: Identifiable {
     // Cached data for selected variable
     private var cachedVariableData: [String: [CDFValue]] = [:]
 
-    init(url: URL) throws {
+    init(url: URL, displayName: String? = nil) throws {
         self.url = url
         self.reader = try CDFReader(url: url)
 
         // Parse immediately
         do {
             try reader.parse()
-            self.fileInfo = reader.fileInfo
+            self.fileInfo = reader.fileInfo(displayName: displayName)
             self.variables = reader.variables
             self.attributes = reader.attributes
             self.warnings = reader.warnings
@@ -41,14 +41,15 @@ final class CDFFile: Identifiable {
                 majority: "Unknown",
                 numVariables: 0,
                 numAttributes: 0,
-                copyright: ""
+                copyright: "",
+                displayName: displayName
             )
             throw error
         }
     }
 
     var fileName: String {
-        url.lastPathComponent
+        fileInfo.fileName
     }
 
     // MARK: - Data Access

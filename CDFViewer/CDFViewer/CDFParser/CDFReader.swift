@@ -378,7 +378,7 @@ final class CDFReader {
 
     // MARK: - File Info
 
-    var fileInfo: CDFFileInfo {
+    func fileInfo(displayName: String? = nil) -> CDFFileInfo {
         CDFFileInfo(
             url: url,
             version: cdr.map { "\($0.version).\($0.release)" } ?? "Unknown",
@@ -386,7 +386,8 @@ final class CDFReader {
             majority: gdr.map { $0.rNumDims > 0 ? "Row" : "N/A" } ?? "Unknown",
             numVariables: variables.count,
             numAttributes: attributes.count,
-            copyright: cdr?.copyright ?? ""
+            copyright: cdr?.copyright ?? "",
+            displayName: displayName
         )
     }
 
@@ -406,9 +407,19 @@ struct CDFFileInfo {
     let numVariables: Int
     let numAttributes: Int
     let copyright: String
+    let fileName: String
 
-    var fileName: String {
-        url.lastPathComponent
+    init(url: URL, version: String, encoding: String, majority: String,
+         numVariables: Int, numAttributes: Int, copyright: String,
+         displayName: String? = nil) {
+        self.url = url
+        self.version = version
+        self.encoding = encoding
+        self.majority = majority
+        self.numVariables = numVariables
+        self.numAttributes = numAttributes
+        self.copyright = copyright
+        self.fileName = displayName ?? url.lastPathComponent
     }
 
     var fileSize: Int64 {

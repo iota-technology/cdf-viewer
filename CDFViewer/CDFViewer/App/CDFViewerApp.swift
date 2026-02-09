@@ -77,7 +77,7 @@ struct CDFDocument: FileDocument {
 
         do {
             try data.write(to: tempURL)
-            cdfFile = try CDFFile(url: tempURL)
+            cdfFile = try CDFFile(url: tempURL, displayName: filename)
         } catch {
             loadError = error
             // Print error for debugging

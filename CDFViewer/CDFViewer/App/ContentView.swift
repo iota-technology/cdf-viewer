@@ -77,38 +77,8 @@ struct ContentView: View {
                 .disabled(document.cdfFile?.ecefPositionVariables().isEmpty ?? true)
             }
 
-            ToolbarItem(placement: .secondaryAction) {
-                // Export button
-                if let variable = viewModel.selectedVariable {
-                    Button {
-                        exportVariable(variable)
-                    } label: {
-                        Label("Export CSV", systemImage: "square.and.arrow.up")
-                    }
-                }
-            }
         }
         .navigationTitle(document.cdfFile?.fileName ?? "CDF Viewer")
-    }
-
-    private func exportVariable(_ variable: CDFVariable) {
-        do {
-            let csv = try viewModel.exportDataAsCSV(variable: variable)
-            let panel = NSSavePanel()
-            panel.allowedContentTypes = [.commaSeparatedText]
-            panel.nameFieldStringValue = "\(variable.name).csv"
-
-            if panel.runModal() == .OK, let url = panel.url {
-                try csv.write(to: url, atomically: true, encoding: .utf8)
-            }
-        } catch {
-            // Show error alert
-            let alert = NSAlert()
-            alert.messageText = "Export Failed"
-            alert.informativeText = error.localizedDescription
-            alert.alertStyle = .warning
-            alert.runModal()
-        }
     }
 }
 
