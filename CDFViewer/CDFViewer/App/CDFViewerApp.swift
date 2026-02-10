@@ -7,17 +7,17 @@ struct CDFViewerApp: App {
     @State private var viewModelRegistry = ViewModelRegistry()
 
     var body: some Scene {
-        DocumentGroup(newDocument: CDFDocument()) { file in
+        DocumentGroup(viewing: CDFDocument.self) { file in
             ContentView(document: file.$document)
                 .environment(viewModelRegistry)
         }
         .commands {
             CommandGroup(replacing: .newItem) {
-                // Remove "New" since we only open existing files
+                // Remove "New" since this is a viewer-only app
             }
         }
 
-        // Chart window
+        // Chart window (opened programmatically, not from menu)
         WindowGroup("Time Series Chart", id: "Time Series Chart", for: UUID.self) { $documentID in
             if let id = documentID, let viewModel = viewModelRegistry.viewModels[id] {
                 TimeSeriesChartView(viewModel: viewModel)
@@ -26,8 +26,9 @@ struct CDFViewerApp: App {
             }
         }
         .defaultSize(width: 900, height: 600)
+        .commandsRemoved()
 
-        // Globe window
+        // Globe window (opened programmatically, not from menu)
         WindowGroup("3D Globe", id: "3D Globe", for: UUID.self) { $documentID in
             if let id = documentID, let viewModel = viewModelRegistry.viewModels[id] {
                 GlobeView(viewModel: viewModel)
@@ -36,6 +37,7 @@ struct CDFViewerApp: App {
             }
         }
         .defaultSize(width: 900, height: 700)
+        .commandsRemoved()
     }
 }
 
@@ -56,7 +58,7 @@ final class ViewModelRegistry {
 // MARK: - CDF Document
 
 struct CDFDocument: FileDocument {
-    static var readableContentTypes: [UTType] { [.cdf, .data] }
+    static var readableContentTypes: [UTType] { [.cdf] }
 
     var cdfFile: CDFFile?
     var loadError: Error?
