@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   build:
-    runs-on: macos-15
+    runs-on: macos-26
 
     steps:
       - name: Checkout code
@@ -89,7 +89,7 @@ jobs:
             5. Open the app (if prompted, right-click → Open)
 
             ### Requirements
-            - macOS 15.0 (Tahoe) or later
+            - macOS 26.0 (Tahoe) or later
           files: |
             CDFViewer/build/Export/CDFViewer-${{ steps.version.outputs.version }}.zip
           draft: false
