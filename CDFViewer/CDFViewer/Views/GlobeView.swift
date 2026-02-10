@@ -4,15 +4,19 @@ import SceneKit
 struct GlobeView: View {
     @Bindable var viewModel: CDFViewModel
 
-    @State private var selectedPositionVariable: CDFVariable?
-    @State private var positions: [(x: Double, y: Double, z: Double)] = []
+    // Selection state (matching Chart view pattern)
+    @State private var selectedTimeVariable: CDFVariable?
+    @State private var selectedPositionVariables: Set<String> = []  // Variable names
+
+    // Globe data - supports multiple tracks
+    @State private var tracks: [String: [(x: Double, y: Double, z: Double)]] = [:]  // varName -> positions
     @State private var timestamps: [Date] = []
     @State private var isLoading = false
     @State private var errorMessage: String?
     @State private var isAnimating = false
     @State private var scene: SCNScene?
-    @State private var trackNode: SCNNode?
-    @State private var trackVertices: [SCNVector3] = []
+    @State private var trackNodes: [String: SCNNode] = [:]  // varName -> track node
+    @State private var trackVerticesCache: [String: [SCNVector3]] = [:]  // varName -> vertices
     @State private var speedMultiplier: Double = 600.0
     @State private var lastExternalProgress: Double = 1.0  // Track external changes
 
@@ -28,6 +32,11 @@ struct GlobeView: View {
     private let earthRadiusKm: Double = 6371.0
     private let metersToSceneUnits: Double = 1.0 / 1_000_000.0  // 1 scene unit = 1000 km
 
+    /// Set of ECEF variable names for fast lookup
+    private var ecefVariableNames: Set<String> {
+        Set(viewModel.cdfFile?.ecefPositionVariables().map { $0.name } ?? [])
+    }
+
     /// Current timestamp based on cursor progress
     private var currentTimestamp: Date? {
         guard !timestamps.isEmpty else { return nil }
@@ -35,177 +44,38 @@ struct GlobeView: View {
         return timestamps[index]
     }
 
+    /// Total positions across all tracks (for track info display)
+    private var totalPositions: Int {
+        tracks.values.first?.count ?? 0
+    }
+
     var body: some View {
-        HSplitView {
-                // Controls sidebar using reusable component
-                VStack(alignment: .leading, spacing: 0) {
-                    VariableSidebarView(
-                        title: "ECEF Position",
-                        variables: viewModel.cdfFile?.ecefPositionVariables() ?? [],
-                        selection: $selectedPositionVariable,
-                        showDataTypeInfo: true
-                    )
-
-                    Divider()
-                        .padding(.vertical, 8)
-
-                    // Load button and controls
-                    VStack(alignment: .leading, spacing: 16) {
-                        Button(action: loadPositions) {
-                            if isLoading {
-                                ProgressView()
-                                    .scaleEffect(0.7)
-                            } else {
-                                Label("Load Track", systemImage: "globe")
-                            }
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .disabled(selectedPositionVariable == nil || isLoading)
-                        .padding(.horizontal, 12)
-
-                        // Stats
-                        if !positions.isEmpty {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("Track Info")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-
-                                Text("\(positions.count) points")
-                                if let first = positions.first, let last = positions.last {
-                                    let startAlt = altitude(x: first.x, y: first.y, z: first.z)
-                                    let endAlt = altitude(x: last.x, y: last.y, z: last.z)
-                                    Text("Start: \(formatKm(startAlt))")
-                                    Text("End: \(formatKm(endAlt))")
-                                }
-                            }
-                            .font(.system(size: 11))
-                            .foregroundStyle(.secondary)
-                            .padding(.horizontal, 12)
-                        }
-
-                        Spacer()
-                    }
-                }
-                .frame(width: 240)
-
-                // 3D Scene
-                VStack {
-                    if let error = errorMessage {
-                        ContentUnavailableView(
-                            "Error",
-                            systemImage: "exclamationmark.triangle",
-                            description: Text(error)
-                        )
-                    } else if let scene = scene {
-                        SceneView(
-                            scene: scene,
-                            options: [.allowsCameraControl, .autoenablesDefaultLighting]
-                        )
-                        .background(Color.black)
-                        .overlay(alignment: .bottom) {
-                            if !positions.isEmpty {
-                                // QuickTime-style scrubber overlay
-                                VStack(spacing: 8) {
-                                    // Timestamp display
-                                    if let currentDate = currentTimestamp {
-                                        Text(currentDate, format: .dateTime.year().month().day().hour().minute())
-                                            .font(.system(size: 18, weight: .medium).monospacedDigit())
-                                            .foregroundStyle(.white)
-                                            .shadow(color: .black, radius: 2)
-                                    }
-
-                                    // Scrubber controls
-                                    HStack(spacing: 12) {
-                                        // Play/Pause button
-                                        Button {
-                                            toggleAnimation()
-                                        } label: {
-                                            Image(systemName: isAnimating ? "pause.fill" : "play.fill")
-                                                .font(.title2)
-                                        }
-                                        .buttonStyle(.plain)
-                                        .foregroundStyle(.white)
-
-                                        // Pause indicator (synced with table/chart)
-                                        if viewModel.isCursorPaused && !isAnimating {
-                                            Image(systemName: "pause.circle.fill")
-                                                .font(.caption)
-                                                .foregroundStyle(.orange)
-                                        }
-
-                                        // Scrubber slider - bound to shared cursor progress
-                                        Slider(value: $viewModel.cursorProgress, in: 0...1)
-                                            .tint(viewModel.isCursorPaused ? .orange : .white)
-                                            .frame(minWidth: 200)
-
-                                        // Speed picker
-                                        Menu {
-                                            ForEach(speedOptions, id: \.value) { option in
-                                                Button {
-                                                    speedMultiplier = option.value
-                                                } label: {
-                                                    HStack {
-                                                        Text(option.label)
-                                                        if speedMultiplier == option.value {
-                                                            Image(systemName: "checkmark")
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        } label: {
-                                            Text(speedOptions.first { $0.value == speedMultiplier }?.label ?? "\(Int(speedMultiplier))×")
-                                                .font(.system(.body, design: .monospaced))
-                                                .foregroundStyle(.white)
-                                                .frame(width: 60)
-                                        }
-                                        .menuStyle(.borderlessButton)
-                                    }
-                                    .padding(.horizontal, 16)
-                                    .padding(.vertical, 10)
-                                    .background(.black.opacity(0.6))
-                                    .clipShape(RoundedRectangle(cornerRadius: 8))
-                                }
-                                .padding(.bottom, 20)
-                                .padding(.horizontal, 20)
-                            }
-                        }
-                    } else {
-                        ContentUnavailableView(
-                            "No Track Loaded",
-                            systemImage: "globe",
-                            description: Text("Select a position variable and click Load Track")
-                        )
-                    }
-                }
-            }
+        NavigationSplitView {
+            sidebarView
+                .navigationSplitViewColumnWidth(min: 200, ideal: 280, max: 400)
+        } detail: {
+            globeAreaView
+        }
         .onAppear {
-            if scene == nil {
-                scene = createInitialScene()
-            }
-            // Auto-select and load if there's only one position variable
-            if let file = viewModel.cdfFile {
-                let posVars = file.ecefPositionVariables()
-                selectedPositionVariable = posVars.first
-                if posVars.count == 1 {
-                    loadPositions()
-                }
-            }
+            setupInitialSelection()
+        }
+        .onChange(of: selectedPositionVariables) { _, _ in
+            loadPositions()
         }
         .onChange(of: viewModel.cursorProgress) { oldValue, newValue in
-            updateMarkerPosition()
+            updateMarkerPositions()
             updateTrackProgress()
 
             // If progress changed externally (not from our animation), stop animating
             if isAnimating && abs(newValue - lastExternalProgress) > 0.001 {
                 // External change detected (from table/chart hover or slider drag)
                 isAnimating = false
-                // Note: isCursorPaused is set by the source of the change
             }
             lastExternalProgress = newValue
         }
-        .onChange(of: positions.count) {
-            createTrackGeometry()
-            updateMarkerPosition()
+        .onChange(of: tracks.count) {
+            createTrackGeometries()
+            updateMarkerPositions()
             updateTrackProgress()
         }
         .onChange(of: viewModel.isCursorPaused) { _, isPaused in
@@ -215,13 +85,192 @@ struct GlobeView: View {
             }
         }
         .onKeyPress(.space) {
-            if !positions.isEmpty {
+            if !tracks.isEmpty {
                 toggleAnimation()
                 return .handled
             }
             return .ignored
         }
         .focusable()
+    }
+
+    // MARK: - Sidebar
+
+    private var sidebarView: some View {
+        VariableSidebarView(
+            singleSelection: $selectedTimeVariable,
+            multiSelection: $selectedPositionVariables,
+            sections: sidebarSections,
+            showDataTypeInfo: true,
+            expandVectors: false,  // Globe shows whole vectors, not X/Y/Z components
+            isDisabled: { variable in
+                // Disable non-ECEF variables in the Position section
+                // (Time variables are never disabled)
+                !ecefVariableNames.contains(variable.name) &&
+                !(viewModel.cdfFile?.timestampVariables().contains(where: { $0.name == variable.name }) ?? false)
+            },
+            colorForKey: trackColor,
+            singleSelectionTrailing: { variable in
+                // Show timestamp for selected time variable
+                if selectedTimeVariable == variable, let date = currentTimestamp {
+                    HStack(spacing: 4) {
+                        Text(date, format: .dateTime.month().day().hour().minute().second())
+                            .font(.system(size: 11, design: .monospaced))
+                            .foregroundStyle(.secondary)
+                        if viewModel.isCursorPaused && !isAnimating {
+                            Image(systemName: "pause.fill")
+                                .font(.system(size: 9))
+                                .foregroundStyle(.orange)
+                        }
+                    }
+                }
+            }
+        )
+    }
+
+    private var sidebarSections: [VariableSectionConfig] {
+        guard let file = viewModel.cdfFile else { return [] }
+        return [
+            VariableSectionConfig(
+                title: "Time Variable",
+                variables: file.timestampVariables(),
+                selectionMode: .single
+            ),
+            VariableSectionConfig(
+                title: "Position Variables",
+                variables: file.numericVariables(),
+                selectionMode: .multi
+            )
+        ]
+    }
+
+    /// Get track color by variable name (for sidebar indicator)
+    private func trackColor(for name: String) -> Color? {
+        guard let index = Array(selectedPositionVariables.sorted()).firstIndex(of: name) else {
+            return nil
+        }
+        return trackColorPalette[index % trackColorPalette.count]
+    }
+
+    /// Colors for multiple tracks
+    private var trackColorPalette: [Color] {
+        [.yellow, .cyan, .green, .orange, .pink, .purple]
+    }
+
+    private func setupInitialSelection() {
+        guard let file = viewModel.cdfFile else { return }
+
+        // Select first time variable
+        selectedTimeVariable = file.timestampVariables().first
+
+        // Only pre-select ECEF variable if there's exactly one
+        let posVars = file.ecefPositionVariables()
+        if posVars.count == 1, let onlyPos = posVars.first {
+            selectedPositionVariables.insert(onlyPos.name)
+        }
+
+        // Create initial scene
+        if scene == nil {
+            scene = createInitialScene()
+        }
+
+        // If nothing selected, ensure no tracks are shown
+        if selectedPositionVariables.isEmpty {
+            clearAllTracks()
+        }
+    }
+
+    // MARK: - Globe Area
+
+    private var globeAreaView: some View {
+        VStack {
+            if let error = errorMessage {
+                ContentUnavailableView(
+                    "Error",
+                    systemImage: "exclamationmark.triangle",
+                    description: Text(error)
+                )
+            } else if let scene = scene {
+                SceneView(
+                    scene: scene,
+                    options: [.allowsCameraControl, .autoenablesDefaultLighting]
+                )
+                .background(Color.black)
+                .overlay(alignment: .bottom) {
+                    if !tracks.isEmpty {
+                        // QuickTime-style scrubber overlay
+                        VStack(spacing: 8) {
+                            // Timestamp display
+                            if let currentDate = currentTimestamp {
+                                Text(currentDate, format: .dateTime.year().month().day().hour().minute())
+                                    .font(.system(size: 18, weight: .medium).monospacedDigit())
+                                    .foregroundStyle(.white)
+                                    .shadow(color: .black, radius: 2)
+                            }
+
+                            // Scrubber controls
+                            HStack(spacing: 12) {
+                                // Play/Pause button
+                                Button {
+                                    toggleAnimation()
+                                } label: {
+                                    Image(systemName: isAnimating ? "pause.fill" : "play.fill")
+                                        .font(.title2)
+                                }
+                                .buttonStyle(.plain)
+                                .foregroundStyle(.white)
+
+                                // Pause indicator (synced with table/chart)
+                                if viewModel.isCursorPaused && !isAnimating {
+                                    Image(systemName: "pause.circle.fill")
+                                        .font(.caption)
+                                        .foregroundStyle(.orange)
+                                }
+
+                                // Scrubber slider - bound to shared cursor progress
+                                Slider(value: $viewModel.cursorProgress, in: 0...1)
+                                    .tint(viewModel.isCursorPaused ? .orange : .white)
+                                    .frame(minWidth: 200)
+
+                                // Speed picker
+                                Menu {
+                                    ForEach(speedOptions, id: \.value) { option in
+                                        Button {
+                                            speedMultiplier = option.value
+                                        } label: {
+                                            HStack {
+                                                Text(option.label)
+                                                if speedMultiplier == option.value {
+                                                    Image(systemName: "checkmark")
+                                                }
+                                            }
+                                        }
+                                    }
+                                } label: {
+                                    Text(speedOptions.first { $0.value == speedMultiplier }?.label ?? "\(Int(speedMultiplier))×")
+                                        .font(.system(.body, design: .monospaced))
+                                        .foregroundStyle(.white)
+                                        .frame(width: 60)
+                                }
+                                .menuStyle(.borderlessButton)
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 10)
+                            .background(.black.opacity(0.6))
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                        }
+                        .padding(.bottom, 20)
+                        .padding(.horizontal, 20)
+                    }
+                }
+            } else {
+                ContentUnavailableView(
+                    "No Track Loaded",
+                    systemImage: "globe",
+                    description: Text("Select a position variable to load the track")
+                )
+            }
+        }
     }
 
     // MARK: - Scene Creation
@@ -276,88 +325,149 @@ struct GlobeView: View {
         return newScene
     }
 
-    /// Creates the full track geometry - vertices are created once, indices updated per frame
-    private func createTrackGeometry() {
-        guard let scene = scene, positions.count > 1 else { return }
+    /// Creates track geometries for all selected position variables
+    private func createTrackGeometries() {
+        guard let scene = scene else { return }
 
-        // Remove existing track
-        scene.rootNode.childNode(withName: "track", recursively: false)?.removeFromParentNode()
-        trackNode = nil
+        // Remove existing tracks and markers
+        for (varName, _) in trackNodes {
+            scene.rootNode.childNode(withName: "track_\(varName)", recursively: false)?.removeFromParentNode()
+            scene.rootNode.childNode(withName: "marker_\(varName)", recursively: false)?.removeFromParentNode()
+        }
+        trackNodes = [:]
+        trackVerticesCache = [:]
 
-        // Cache vertices
-        trackVertices = positions.map { ecefToSceneKit($0.x, $0.y, $0.z) }
+        // Create geometry for each track
+        let sortedVars = selectedPositionVariables.sorted()
+        for (index, varName) in sortedVars.enumerated() {
+            guard let positions = tracks[varName], positions.count > 1 else { continue }
 
-        // Create initial geometry with all segments visible
-        updateTrackGeometryElement()
+            // Cache vertices
+            let vertices = positions.map { ecefToSceneKit($0.x, $0.y, $0.z) }
+            trackVerticesCache[varName] = vertices
+
+            // Create track node
+            let color = nsColorForTrack(index: index)
+            let node = createTrackNode(vertices: vertices, color: color, name: "track_\(varName)")
+            scene.rootNode.addChildNode(node)
+            trackNodes[varName] = node
+
+            // Create marker
+            let markerNode = createMarkerNode(color: color, name: "marker_\(varName)")
+            scene.rootNode.addChildNode(markerNode)
+        }
+
+        updateTrackProgress()
     }
 
-    /// Updates the track by recreating geometry with current progress
-    /// This is fast because we reuse cached vertices
-    private func updateTrackProgress() {
-        updateTrackGeometryElement()
-    }
-
-    /// Creates/updates track geometry element based on current progress
-    private func updateTrackGeometryElement() {
-        guard let scene = scene, trackVertices.count > 1 else { return }
-
-        // Calculate how many segments to show
-        let visibleSegments = max(1, Int(Double(trackVertices.count - 1) * viewModel.cursorProgress))
-
-        // Create indices only for visible segments
+    private func createTrackNode(vertices: [SCNVector3], color: NSColor, name: String) -> SCNNode {
+        let vertexSource = SCNGeometrySource(vertices: vertices)
         var indices: [Int32] = []
-        indices.reserveCapacity(visibleSegments * 2)
-        for i in 0..<visibleSegments {
+        for i in 0..<(vertices.count - 1) {
             indices.append(Int32(i))
             indices.append(Int32(i + 1))
         }
-
-        let vertexSource = SCNGeometrySource(vertices: trackVertices)
         let indexData = Data(bytes: indices, count: indices.count * MemoryLayout<Int32>.size)
         let element = SCNGeometryElement(
             data: indexData,
             primitiveType: .line,
-            primitiveCount: visibleSegments,
+            primitiveCount: vertices.count - 1,
             bytesPerIndex: MemoryLayout<Int32>.size
         )
 
         let geometry = SCNGeometry(sources: [vertexSource], elements: [element])
-
-        // Material
         let material = SCNMaterial()
-        material.diffuse.contents = NSColor.yellow
-        material.emission.contents = NSColor.yellow
+        material.diffuse.contents = color
+        material.emission.contents = color
         material.lightingModel = .constant
         geometry.materials = [material]
 
-        // Update or create node
-        if let existingNode = trackNode {
-            existingNode.geometry = geometry
-        } else {
-            let node = SCNNode(geometry: geometry)
-            node.name = "track"
-            scene.rootNode.addChildNode(node)
-            trackNode = node
+        let node = SCNNode(geometry: geometry)
+        node.name = name
+        return node
+    }
+
+    private func createMarkerNode(color: NSColor, name: String) -> SCNNode {
+        let markerGeometry = SCNSphere(radius: 0.05)
+        let material = SCNMaterial()
+        material.diffuse.contents = color
+        material.emission.contents = color
+        markerGeometry.materials = [material]
+
+        let node = SCNNode(geometry: markerGeometry)
+        node.name = name
+        return node
+    }
+
+    private func nsColorForTrack(index: Int) -> NSColor {
+        let colors: [NSColor] = [.yellow, .cyan, .green, .orange, .magenta, .purple]
+        return colors[index % colors.count]
+    }
+
+    /// Updates track visibility based on current progress
+    private func updateTrackProgress() {
+        guard let scene = scene else { return }
+
+        for (varName, vertices) in trackVerticesCache {
+            guard vertices.count > 1,
+                  let trackNode = trackNodes[varName] else { continue }
+
+            // Calculate how many segments to show
+            let visibleSegments = max(1, Int(Double(vertices.count - 1) * viewModel.cursorProgress))
+
+            // Recreate geometry with visible segments only
+            var indices: [Int32] = []
+            indices.reserveCapacity(visibleSegments * 2)
+            for i in 0..<visibleSegments {
+                indices.append(Int32(i))
+                indices.append(Int32(i + 1))
+            }
+
+            let vertexSource = SCNGeometrySource(vertices: vertices)
+            let indexData = Data(bytes: indices, count: indices.count * MemoryLayout<Int32>.size)
+            let element = SCNGeometryElement(
+                data: indexData,
+                primitiveType: .line,
+                primitiveCount: visibleSegments,
+                bytesPerIndex: MemoryLayout<Int32>.size
+            )
+
+            let geometry = SCNGeometry(sources: [vertexSource], elements: [element])
+            geometry.materials = trackNode.geometry?.materials ?? []
+            trackNode.geometry = geometry
         }
     }
 
-    /// Called during animation - only updates marker position (no geometry recreation)
-    private func updateMarkerPosition() {
-        guard let scene = scene, !positions.isEmpty else { return }
+    /// Updates marker positions for all tracks
+    private func updateMarkerPositions() {
+        guard let scene = scene else { return }
 
-        // Calculate which position to show
-        let index = max(0, Int(Double(positions.count - 1) * viewModel.cursorProgress))
-        let currentPos = positions[index]
-        let scenePos = ecefToSceneKit(currentPos.x, currentPos.y, currentPos.z)
+        for (varName, positions) in tracks {
+            guard !positions.isEmpty else { continue }
 
-        // Get or create marker node
-        if let markerNode = scene.rootNode.childNode(withName: "current", recursively: false) {
-            // Just update position - no node recreation
-            markerNode.position = scenePos
-        } else {
-            // Create marker if it doesn't exist
-            addCurrentPositionMarker(to: scene, position: currentPos)
+            let index = max(0, Int(Double(positions.count - 1) * viewModel.cursorProgress))
+            let currentPos = positions[index]
+            let scenePos = ecefToSceneKit(currentPos.x, currentPos.y, currentPos.z)
+
+            if let markerNode = scene.rootNode.childNode(withName: "marker_\(varName)", recursively: false) {
+                markerNode.position = scenePos
+            }
         }
+    }
+
+    /// Removes all track and marker nodes from the scene
+    private func clearAllTracks() {
+        guard let scene = scene else { return }
+
+        // Remove ALL track and marker nodes by name pattern
+        // This is more robust than relying on trackNodes dictionary
+        scene.rootNode.childNodes.filter {
+            $0.name?.hasPrefix("track_") == true || $0.name?.hasPrefix("marker_") == true
+        }.forEach { $0.removeFromParentNode() }
+
+        // Clear caches
+        trackNodes = [:]
+        trackVerticesCache = [:]
     }
 
     private func createEarthTexture() -> Any {
@@ -368,22 +478,6 @@ struct GlobeView: View {
         }
         // Fallback to simple blue color if texture not found
         return NSColor(red: 0.1, green: 0.3, blue: 0.6, alpha: 1.0)
-    }
-
-    private func addCurrentPositionMarker(to scene: SCNScene, position: (x: Double, y: Double, z: Double)) {
-        let scenePos = ecefToSceneKit(position.x, position.y, position.z)
-
-        // Larger marker for current position
-        let markerGeometry = SCNSphere(radius: 0.05)
-        let material = SCNMaterial()
-        material.diffuse.contents = NSColor.red
-        material.emission.contents = NSColor.red
-        markerGeometry.materials = [material]
-
-        let markerNode = SCNNode(geometry: markerGeometry)
-        markerNode.position = scenePos
-        markerNode.name = "current"
-        scene.rootNode.addChildNode(markerNode)
     }
 
     // MARK: - Coordinate Conversion
@@ -412,29 +506,52 @@ struct GlobeView: View {
     // MARK: - Data Loading
 
     private func loadPositions() {
-        guard let file = viewModel.cdfFile,
-              let posVar = selectedPositionVariable else { return }
+        guard let file = viewModel.cdfFile else { return }
+
+        // Filter to only ECEF variables that are selected
+        let selectedEcefVars = selectedPositionVariables.filter { ecefVariableNames.contains($0) }
+        guard !selectedEcefVars.isEmpty else {
+            // Clear all tracks and remove from scene
+            tracks = [:]
+            timestamps = []
+            clearAllTracks()
+            return
+        }
 
         isLoading = true
         errorMessage = nil
-        positions = []
+        tracks = [:]
         timestamps = []
 
         Task { @MainActor in
             do {
-                positions = try file.readECEFPositions(for: posVar)
+                // Load positions for each selected variable
+                var newTracks: [String: [(x: Double, y: Double, z: Double)]] = [:]
 
-                // Try to load corresponding timestamps
-                if let timeVar = file.timestampVariables().first {
+                for varName in selectedEcefVars {
+                    guard let posVar = file.variables.first(where: { $0.name == varName }) else { continue }
+                    let positions = try file.readECEFPositions(for: posVar)
+                    newTracks[varName] = positions
+                }
+
+                tracks = newTracks
+
+                // Load timestamps from selected time variable (or first available)
+                let timeVar = selectedTimeVariable ?? file.timestampVariables().first
+                if let timeVar = timeVar {
                     let timeValues = try file.readTimestamps(for: timeVar)
-                    // Convert to Dates, matching position count
-                    let count = min(timeValues.count, positions.count)
+                    // Use the length of the first track for matching
+                    let posCount = tracks.values.first?.count ?? timeValues.count
+                    let count = min(timeValues.count, posCount)
                     timestamps = timeValues.prefix(count).map { Date(timeIntervalSince1970: $0) }
                 }
 
                 viewModel.cursorProgress = 1.0
                 lastExternalProgress = 1.0
                 isLoading = false
+
+                // Trigger geometry creation
+                createTrackGeometries()
             } catch {
                 errorMessage = error.localizedDescription
                 isLoading = false

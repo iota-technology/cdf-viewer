@@ -38,6 +38,10 @@ struct VariableSidebarView<TrailingContent: View>: View {
     /// Whether to show data type and record count under variable names
     var showDataTypeInfo: Bool = true
 
+    /// Whether to expand vector variables into individual components (X, Y, Z)
+    /// When false, vectors are shown as a single selectable item
+    var expandVectors: Bool = true
+
     /// Optional trailing content for single selection rows (e.g., timestamp display)
     @ViewBuilder var singleSelectionTrailing: (CDFVariable) -> TrailingContent
 
@@ -149,6 +153,7 @@ struct VariableSidebarView<TrailingContent: View>: View {
 
     private func multiSelectionRow(_ variable: CDFVariable) -> some View {
         let disabled = isDisabled?(variable) ?? false
+        let shouldExpand = expandVectors && variable.isVector
 
         return VStack(alignment: .leading, spacing: 0) {
             // Main variable row
@@ -164,23 +169,30 @@ struct VariableSidebarView<TrailingContent: View>: View {
                         .foregroundStyle(disabled ? .secondary : .primary)
 
                     if showDataTypeInfo {
-                        Text("\(variable.dataType.displayName) [\(variable.recordCount)]")
-                            .font(.system(size: 10))
-                            .foregroundStyle(.tertiary)
+                        // Show vector size when not expanding (e.g., "DOUBLE[3]")
+                        if variable.isVector && !expandVectors {
+                            Text("\(variable.dataType.displayName)[\(variable.displayColumnsPerRow)]")
+                                .font(.system(size: 10))
+                                .foregroundStyle(.tertiary)
+                        } else {
+                            Text("\(variable.dataType.displayName) [\(variable.recordCount)]")
+                                .font(.system(size: 10))
+                                .foregroundStyle(.tertiary)
+                        }
                     }
                 }
 
                 Spacer()
 
-                // Show value on hover (for scalar variables only)
-                if !variable.isVector, let value = valueForKey?(variable.name) {
+                // Show value on hover (for scalar variables, or vectors when not expanded)
+                if !shouldExpand, let value = valueForKey?(variable.name) {
                     Text(formatValue(value))
                         .font(.system(size: 11, design: .monospaced))
                         .foregroundStyle(.secondary)
                 }
 
-                // Color indicator for scalar variables
-                if !variable.isVector, let color = colorForKey?(variable.name) {
+                // Color indicator (for scalar variables, or vectors when not expanded)
+                if !shouldExpand, let color = colorForKey?(variable.name) {
                     Circle()
                         .fill(color)
                         .frame(width: 8, height: 8)
@@ -192,11 +204,11 @@ struct VariableSidebarView<TrailingContent: View>: View {
             .opacity(disabled ? 0.5 : 1.0)
             .onTapGesture {
                 guard !disabled else { return }
-                toggleVariable(variable)
+                toggleVariable(variable, expanded: shouldExpand)
             }
 
-            // Component sub-items for vectors
-            if variable.isVector {
+            // Component sub-items for vectors (only when expanding)
+            if shouldExpand {
                 let components = componentNames(for: variable)
                 ForEach(components, id: \.self) { component in
                     componentRow(variable: variable, component: component, disabled: disabled)
@@ -262,16 +274,19 @@ struct VariableSidebarView<TrailingContent: View>: View {
     // MARK: - Selection Logic
 
     private func isVariableOrComponentSelected(_ variable: CDFVariable) -> Bool {
-        if variable.isVector {
+        if variable.isVector && expandVectors {
+            // Expanded mode: check if any component is selected
             let components = componentNames(for: variable)
             return components.contains { multiSelection.contains("\(variable.name).\($0)") }
         } else {
+            // Scalar or non-expanded vector: check by variable name
             return multiSelection.contains(variable.name)
         }
     }
 
-    private func toggleVariable(_ variable: CDFVariable) {
-        if variable.isVector {
+    private func toggleVariable(_ variable: CDFVariable, expanded: Bool = true) {
+        if variable.isVector && expanded {
+            // Expanded mode: toggle all component keys
             let components = componentNames(for: variable)
             let keys = components.map { "\(variable.name).\($0)" }
             let allSelected = keys.allSatisfy { multiSelection.contains($0) }
@@ -286,6 +301,7 @@ struct VariableSidebarView<TrailingContent: View>: View {
                 }
             }
         } else {
+            // Scalar or non-expanded vector: toggle by variable name
             if multiSelection.contains(variable.name) {
                 multiSelection.remove(variable.name)
             } else {
@@ -330,6 +346,7 @@ extension VariableSidebarView where TrailingContent == EmptyView {
             VariableSectionConfig(title: title, variables: variables, selectionMode: .single)
         ]
         self.showDataTypeInfo = showDataTypeInfo
+        self.expandVectors = true
         self.isDisabled = isDisabled
         self.singleSelectionTrailing = { _ in EmptyView() }
     }
@@ -340,6 +357,7 @@ extension VariableSidebarView where TrailingContent == EmptyView {
         multiSelection: Binding<Set<String>>,
         sections: [VariableSectionConfig],
         showDataTypeInfo: Bool = true,
+        expandVectors: Bool = true,
         isDisabled: ((CDFVariable) -> Bool)? = nil,
         colorForKey: ((String) -> Color?)? = nil,
         valueForKey: ((String) -> Double?)? = nil
@@ -348,6 +366,7 @@ extension VariableSidebarView where TrailingContent == EmptyView {
         self._multiSelection = multiSelection
         self.sections = sections
         self.showDataTypeInfo = showDataTypeInfo
+        self.expandVectors = expandVectors
         self.isDisabled = isDisabled
         self.colorForKey = colorForKey
         self.valueForKey = valueForKey
@@ -362,6 +381,7 @@ extension VariableSidebarView {
         multiSelection: Binding<Set<String>>,
         sections: [VariableSectionConfig],
         showDataTypeInfo: Bool = true,
+        expandVectors: Bool = true,
         isDisabled: ((CDFVariable) -> Bool)? = nil,
         colorForKey: ((String) -> Color?)? = nil,
         valueForKey: ((String) -> Double?)? = nil,
@@ -371,6 +391,7 @@ extension VariableSidebarView {
         self._multiSelection = multiSelection
         self.sections = sections
         self.showDataTypeInfo = showDataTypeInfo
+        self.expandVectors = expandVectors
         self.isDisabled = isDisabled
         self.colorForKey = colorForKey
         self.valueForKey = valueForKey
