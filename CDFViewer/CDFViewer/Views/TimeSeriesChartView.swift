@@ -4,6 +4,11 @@ import Charts
 struct TimeSeriesChartView: View {
     @Bindable var viewModel: CDFViewModel
 
+    // Color palette matching Swift Charts default
+    private static let chartColors: [Color] = [
+        .blue, .orange, .green, .red, .purple, .brown, .pink, .gray, .cyan, .yellow
+    ]
+
     // Selection state
     @State private var selectedTimeVariable: CDFVariable?
     @State private var selectedComponents: Set<String> = [] // "varName" or "varName.X"
@@ -153,11 +158,18 @@ struct TimeSeriesChartView: View {
 
                 Spacer()
 
-                // Show value on hover
-                if let value = getCurrentValue(for: variable.name) {
+                // Show value on hover (for scalar variables only)
+                if !variable.isVector, let value = getCurrentValue(for: variable.name) {
                     Text(formatValue(value))
                         .font(.system(size: 11, design: .monospaced))
                         .foregroundStyle(.secondary)
+                }
+
+                // Color indicator for scalar variables
+                if !variable.isVector, let color = seriesColor(for: variable.name) {
+                    Circle()
+                        .fill(color)
+                        .frame(width: 8, height: 8)
                 }
             }
             .padding(.horizontal, 12)
@@ -197,6 +209,13 @@ struct TimeSeriesChartView: View {
                 Text(formatValue(value))
                     .font(.system(size: 11, design: .monospaced))
                     .foregroundStyle(.secondary)
+            }
+
+            // Color indicator
+            if let color = seriesColor(for: key) {
+                Circle()
+                    .fill(color)
+                    .frame(width: 8, height: 8)
             }
         }
         .padding(.leading, 32)
@@ -293,13 +312,13 @@ struct TimeSeriesChartView: View {
     @ViewBuilder
     private var chartView: some View {
         Chart {
-            ForEach(chartSeries) { series in
+            ForEach(Array(chartSeries.enumerated()), id: \.element.id) { index, series in
                 ForEach(series.points) { point in
                     LineMark(
                         x: .value("Time", point.date),
                         y: .value(series.name, point.value)
                     )
-                    .foregroundStyle(by: .value("Variable", series.name))
+                    .foregroundStyle(Self.chartColors[index % Self.chartColors.count])
                 }
             }
 
@@ -491,6 +510,14 @@ struct TimeSeriesChartView: View {
         } else {
             return String(format: "%.2f", value)
         }
+    }
+
+    /// Get the color for a series by name (based on its index in chartSeries)
+    private func seriesColor(for name: String) -> Color? {
+        guard let index = chartSeries.firstIndex(where: { $0.name == name }) else {
+            return nil
+        }
+        return Self.chartColors[index % Self.chartColors.count]
     }
 }
 
