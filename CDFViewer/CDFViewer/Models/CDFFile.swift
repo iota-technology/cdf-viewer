@@ -8,6 +8,9 @@ final class CDFFile: Identifiable {
     let url: URL
     private let reader: CDFReader
 
+    /// Parser options for configuring how data is interpreted
+    let parserOptions: CDFParserOptions
+
     // Parsed data
     private(set) var fileInfo: CDFFileInfo
     private(set) var variables: [CDFVariable] = []
@@ -18,9 +21,10 @@ final class CDFFile: Identifiable {
     // Cached data
     private var cachedVariableData: [String: [CDFValue]] = [:]
 
-    init(url: URL, displayName: String? = nil) throws {
+    init(url: URL, displayName: String? = nil, options: CDFParserOptions = .default) throws {
         self.url = url
         self.reader = try CDFReader(url: url)
+        self.parserOptions = options
 
         // Parse immediately
         do {
@@ -57,7 +61,20 @@ final class CDFFile: Identifiable {
             return cached
         }
 
-        let data = try reader.readVariableData(variable)
+        var data = try reader.readVariableData(variable)
+
+        // Convert INT8 "timestamp*" variables to Unix timestamps if option is enabled
+        if parserOptions.treatInt64TimestampAsUnixMicroseconds &&
+           variable.dataType == .int8 &&
+           variable.name.lowercased().hasPrefix("timestamp") {
+            data = data.map { value in
+                if case .int64(let v) = value {
+                    return .unixTimestamp(v)
+                }
+                return value
+            }
+        }
+
         cachedVariableData[variable.name] = data
         return data
     }
@@ -156,6 +173,10 @@ final class CDFFile: Identifiable {
             case .int64(let v):
                 // Regular int64 - assume milliseconds since Unix epoch
                 return Double(v) / 1000.0
+
+            case .unixTimestamp(let v):
+                // Unix timestamp in microseconds -> convert to seconds
+                return Double(v) / 1_000_000.0
 
             default:
                 return nil

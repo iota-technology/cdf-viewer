@@ -1,5 +1,21 @@
 import Foundation
 
+// MARK: - Parser Options
+
+/// Configuration options for CDF parsing behavior
+struct CDFParserOptions {
+    /// When enabled, treats INT8 variables with names starting with "timestamp"
+    /// as Unix timestamps in microseconds (microseconds since 1970-01-01).
+    /// Default: false (INT8 values are read as raw integers)
+    var treatInt64TimestampAsUnixMicroseconds: Bool = false
+
+    /// Default options (no special handling)
+    static let `default` = CDFParserOptions()
+
+    /// Options with Unix timestamp interpretation for INT8 "timestamp*" variables
+    static let withUnixTimestamps = CDFParserOptions(treatInt64TimestampAsUnixMicroseconds: true)
+}
+
 /// CDF data type codes
 enum CDFDataType: Int32 {
     case int1 = 1        // CDF_INT1 - 1-byte signed integer
@@ -84,6 +100,7 @@ enum CDFValue: Hashable {
     case epoch(Double)           // Milliseconds since 0 AD
     case epoch16(Double, Double) // Two doubles for higher precision
     case timeTT2000(Int64)       // Nanoseconds since J2000
+    case unixTimestamp(Int64)    // Microseconds since Unix epoch (1970)
 
     var doubleValue: Double? {
         switch self {
@@ -99,6 +116,7 @@ enum CDFValue: Hashable {
         case .epoch(let v): return v
         case .epoch16(let v, _): return v
         case .timeTT2000(let v): return Double(v)
+        case .unixTimestamp(let v): return Double(v)
         case .string: return nil
         }
     }
@@ -118,6 +136,7 @@ enum CDFValue: Hashable {
         case .epoch(let v): return formatEpoch(v)
         case .epoch16(let v1, let v2): return formatEpoch16(v1, v2)
         case .timeTT2000(let v): return formatTT2000(v)
+        case .unixTimestamp(let v): return formatUnixTimestamp(v)
         }
     }
 
@@ -151,6 +170,15 @@ enum CDFValue: Hashable {
         let j2000Unix = 946728000.0
         let seconds = Double(nanoseconds) / 1e9
         let date = Date(timeIntervalSince1970: j2000Unix + seconds)
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter.string(from: date)
+    }
+
+    private func formatUnixTimestamp(_ microseconds: Int64) -> String {
+        // Unix timestamp: microseconds since 1970-01-01 00:00:00 UTC
+        let seconds = Double(microseconds) / 1_000_000.0
+        let date = Date(timeIntervalSince1970: seconds)
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         return formatter.string(from: date)

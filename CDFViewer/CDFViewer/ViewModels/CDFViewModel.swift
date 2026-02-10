@@ -146,7 +146,7 @@ final class CDFViewModel {
 
     func loadFile(from url: URL) {
         do {
-            cdfFile = try CDFFile(url: url)
+            cdfFile = try CDFFile(url: url, options: .withUnixTimestamps)
             setupDefaults()
         } catch let error as CDFError {
             dataError = error

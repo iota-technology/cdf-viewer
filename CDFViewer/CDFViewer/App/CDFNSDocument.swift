@@ -36,7 +36,7 @@ class CDFNSDocument: NSDocument {
 
     override func read(from url: URL, ofType typeName: String) throws {
         do {
-            cdfFile = try CDFFile(url: url, displayName: url.lastPathComponent)
+            cdfFile = try CDFFile(url: url, displayName: url.lastPathComponent, options: .withUnixTimestamps)
             viewModel.cdfFile = cdfFile
             viewModel.originalFileURL = url
             viewModel.setupDefaults()
