@@ -30,9 +30,70 @@ final class CDFViewModel {
     var globePositionVariable: CDFVariable?
     var showGlobe = false
 
+    // MARK: - Shared Cursor State (synchronized across table, chart, globe)
+
+    /// Current cursor position as row index (nil = not hovering)
+    var cursorIndex: Int?
+
+    /// Whether the cursor is paused (locked to current position)
+    var isCursorPaused: Bool = false
+
+    /// Current cursor as progress (0-1), for globe animation
+    var cursorProgress: Double {
+        get {
+            guard let index = cursorIndex, totalRecords > 0 else { return 1.0 }
+            return Double(index) / Double(max(1, totalRecords - 1))
+        }
+        set {
+            guard totalRecords > 0 else { return }
+            cursorIndex = Int(newValue * Double(totalRecords - 1))
+        }
+    }
+
+    /// Current cursor as Date, for chart
+    var cursorDate: Date? {
+        get {
+            guard let index = cursorIndex, index < tableRows.count else { return nil }
+            return tableRows[index].timestamp
+        }
+        set {
+            guard let date = newValue, !tableRows.isEmpty else {
+                cursorIndex = nil
+                return
+            }
+            // Find closest row to the date
+            var closestIndex = 0
+            var closestDistance = Double.infinity
+            for (i, row) in tableRows.enumerated() {
+                let distance = abs(row.timestamp.timeIntervalSince(date))
+                if distance < closestDistance {
+                    closestDistance = distance
+                    closestIndex = i
+                }
+            }
+            cursorIndex = closestIndex
+        }
+    }
+
+    /// Toggle pause state; if not paused, pause at current position
+    func toggleCursorPause() {
+        if isCursorPaused {
+            isCursorPaused = false
+        } else if cursorIndex != nil {
+            isCursorPaused = true
+        }
+    }
+
+    /// Clear cursor when mouse leaves
+    func clearCursor() {
+        if !isCursorPaused {
+            cursorIndex = nil
+        }
+    }
+
     // Total rows for table
     var totalRecords: Int {
-        tableTimeVariable?.recordCount ?? 0
+        tableTimeVariable?.displayRowCount ?? 0
     }
 
     // MARK: - File Loading
@@ -70,8 +131,7 @@ final class CDFViewModel {
 
     private func loadTableData() {
         guard let file = cdfFile,
-              let timeVar = tableTimeVariable,
-              !tableSelectedComponents.isEmpty else {
+              let timeVar = tableTimeVariable else {
             tableColumns = []
             tableRows = []
             return

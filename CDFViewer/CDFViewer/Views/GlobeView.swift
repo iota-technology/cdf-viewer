@@ -9,12 +9,12 @@ struct GlobeView: View {
     @State private var timestamps: [Date] = []
     @State private var isLoading = false
     @State private var errorMessage: String?
-    @State private var animationProgress: Double = 1.0
     @State private var isAnimating = false
     @State private var scene: SCNScene?
     @State private var trackNode: SCNNode?
     @State private var trackVertices: [SCNVector3] = []
     @State private var speedMultiplier: Double = 600.0
+    @State private var lastExternalProgress: Double = 1.0  // Track external changes
 
     private let speedOptions: [(label: String, value: Double)] = [
         ("60×", 60),
@@ -28,10 +28,10 @@ struct GlobeView: View {
     private let earthRadiusKm: Double = 6371.0
     private let metersToSceneUnits: Double = 1.0 / 1_000_000.0  // 1 scene unit = 1000 km
 
-    /// Current timestamp based on animation progress
+    /// Current timestamp based on cursor progress
     private var currentTimestamp: Date? {
         guard !timestamps.isEmpty else { return nil }
-        let index = max(0, Int(Double(timestamps.count - 1) * animationProgress))
+        let index = max(0, Int(Double(timestamps.count - 1) * viewModel.cursorProgress))
         return timestamps[index]
     }
 
@@ -126,9 +126,16 @@ struct GlobeView: View {
                                         .buttonStyle(.plain)
                                         .foregroundStyle(.white)
 
-                                        // Scrubber slider
-                                        Slider(value: $animationProgress, in: 0...1)
-                                            .tint(.white)
+                                        // Pause indicator (synced with table/chart)
+                                        if viewModel.isCursorPaused && !isAnimating {
+                                            Image(systemName: "pause.circle.fill")
+                                                .font(.caption)
+                                                .foregroundStyle(.orange)
+                                        }
+
+                                        // Scrubber slider - bound to shared cursor progress
+                                        Slider(value: $viewModel.cursorProgress, in: 0...1)
+                                            .tint(viewModel.isCursorPaused ? .orange : .white)
                                             .frame(minWidth: 200)
 
                                         // Speed picker
@@ -184,14 +191,28 @@ struct GlobeView: View {
                 }
             }
         }
-        .onChange(of: animationProgress) {
+        .onChange(of: viewModel.cursorProgress) { oldValue, newValue in
             updateMarkerPosition()
             updateTrackProgress()
+
+            // If progress changed externally (not from our animation), stop animating
+            if isAnimating && abs(newValue - lastExternalProgress) > 0.001 {
+                // External change detected (from table/chart hover or slider drag)
+                isAnimating = false
+                // Note: isCursorPaused is set by the source of the change
+            }
+            lastExternalProgress = newValue
         }
         .onChange(of: positions.count) {
             createTrackGeometry()
             updateMarkerPosition()
             updateTrackProgress()
+        }
+        .onChange(of: viewModel.isCursorPaused) { _, isPaused in
+            // If cursor was paused externally (from table/chart click), stop our animation
+            if isPaused && isAnimating {
+                isAnimating = false
+            }
         }
         .onKeyPress(.space) {
             if !positions.isEmpty {
@@ -281,7 +302,7 @@ struct GlobeView: View {
         guard let scene = scene, trackVertices.count > 1 else { return }
 
         // Calculate how many segments to show
-        let visibleSegments = max(1, Int(Double(trackVertices.count - 1) * animationProgress))
+        let visibleSegments = max(1, Int(Double(trackVertices.count - 1) * viewModel.cursorProgress))
 
         // Create indices only for visible segments
         var indices: [Int32] = []
@@ -325,7 +346,7 @@ struct GlobeView: View {
         guard let scene = scene, !positions.isEmpty else { return }
 
         // Calculate which position to show
-        let index = max(0, Int(Double(positions.count - 1) * animationProgress))
+        let index = max(0, Int(Double(positions.count - 1) * viewModel.cursorProgress))
         let currentPos = positions[index]
         let scenePos = ecefToSceneKit(currentPos.x, currentPos.y, currentPos.z)
 
@@ -411,7 +432,8 @@ struct GlobeView: View {
                     timestamps = timeValues.prefix(count).map { Date(timeIntervalSince1970: $0) }
                 }
 
-                animationProgress = 1.0
+                viewModel.cursorProgress = 1.0
+                lastExternalProgress = 1.0
                 isLoading = false
             } catch {
                 errorMessage = error.localizedDescription
@@ -427,10 +449,15 @@ struct GlobeView: View {
 
         if isAnimating {
             // If at the end, restart from beginning
-            if animationProgress >= 1.0 {
-                animationProgress = 0
+            if viewModel.cursorProgress >= 1.0 {
+                viewModel.cursorProgress = 0
             }
+            // Unfreeze the cursor when animation starts
+            viewModel.isCursorPaused = false
             startAnimation()
+        } else {
+            // Pause the cursor when animation stops
+            viewModel.isCursorPaused = true
         }
     }
 
@@ -451,16 +478,19 @@ struct GlobeView: View {
         let frameInterval: UInt64 = 16_000_000  // ~60fps in nanoseconds
 
         Task { @MainActor in
-            while isAnimating && animationProgress < 1.0 {
+            while isAnimating && viewModel.cursorProgress < 1.0 {
                 try? await Task.sleep(nanoseconds: frameInterval)
                 // Recalculate each frame in case speed changed during animation
                 // At speedMultiplier×, animation completes in (trackDuration / speedMultiplier) seconds
                 let animationDuration = trackDuration / speedMultiplier
                 let progressPerFrame = 1.0 / (animationDuration * 60.0)  // 60 fps
-                animationProgress = min(1.0, animationProgress + progressPerFrame)
+                let newProgress = min(1.0, viewModel.cursorProgress + progressPerFrame)
+                viewModel.cursorProgress = newProgress
+                lastExternalProgress = newProgress  // Track our own updates
             }
-            if animationProgress >= 1.0 {
+            if viewModel.cursorProgress >= 1.0 {
                 isAnimating = false
+                viewModel.isCursorPaused = true
             }
         }
     }

@@ -13,14 +13,9 @@ struct TimeSeriesChartView: View {
     @State private var isLoading = false
     @State private var errorMessage: String?
 
-    // Hover state - tracks date directly for cross-series support
-    @State private var hoverDate: Date?
-    @State private var isPaused = false
-    @State private var pausedDate: Date?
-
-    // Computed active date (paused or hovered)
+    // Use shared cursor from viewModel
     private var activeDate: Date? {
-        isPaused ? pausedDate : hoverDate
+        viewModel.cursorDate
     }
 
     var body: some View {
@@ -60,7 +55,7 @@ struct TimeSeriesChartView: View {
                         Text(date, format: .dateTime.month().day().hour().minute().second())
                             .font(.system(size: 11, design: .monospaced))
                             .foregroundStyle(.secondary)
-                        if isPaused {
+                        if viewModel.isCursorPaused {
                             Image(systemName: "pause.fill")
                                 .font(.system(size: 9))
                                 .foregroundStyle(.orange)
@@ -130,8 +125,8 @@ struct TimeSeriesChartView: View {
             // Vertical cursor line
             if let date = activeDate {
                 RuleMark(x: .value("Cursor", date))
-                    .foregroundStyle(.gray.opacity(0.5))
-                    .lineStyle(StrokeStyle(lineWidth: 1, dash: [5, 5]))
+                    .foregroundStyle(viewModel.isCursorPaused ? .orange.opacity(0.7) : .gray.opacity(0.5))
+                    .lineStyle(StrokeStyle(lineWidth: viewModel.isCursorPaused ? 2 : 1, dash: viewModel.isCursorPaused ? [] : [5, 5]))
             }
         }
         .chartXAxis {
@@ -151,7 +146,7 @@ struct TimeSeriesChartView: View {
                     .fill(.clear)
                     .contentShape(Rectangle())
                     .onContinuousHover { phase in
-                        guard !isPaused else { return }
+                        guard !viewModel.isCursorPaused else { return }
                         switch phase {
                         case .active(let location):
                             // Adjust for plot area offset (accounts for y-axis labels)
@@ -161,22 +156,16 @@ struct TimeSeriesChartView: View {
                                 // Only update if within plot area bounds
                                 if adjustedX >= 0 && adjustedX <= plotRect.width {
                                     if let date: Date = proxy.value(atX: adjustedX) {
-                                        hoverDate = date
+                                        viewModel.cursorDate = date
                                     }
                                 }
                             }
                         case .ended:
-                            hoverDate = nil
+                            viewModel.clearCursor()
                         }
                     }
                     .onTapGesture {
-                        if isPaused {
-                            isPaused = false
-                            pausedDate = nil
-                        } else if hoverDate != nil {
-                            isPaused = true
-                            pausedDate = hoverDate
-                        }
+                        viewModel.toggleCursorPause()
                     }
             }
         }
@@ -233,9 +222,6 @@ struct TimeSeriesChartView: View {
 
         isLoading = true
         errorMessage = nil
-        hoverDate = nil
-        isPaused = false
-        pausedDate = nil
 
         Task { @MainActor in
             do {
