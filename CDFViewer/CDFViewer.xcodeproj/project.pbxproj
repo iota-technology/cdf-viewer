@@ -27,6 +27,7 @@
 		A10000180000000000000012 /* blue_marble.jpg in Resources */ = {isa = PBXBuildFile; fileRef = A20000180000000000000012 /* blue_marble.jpg */; };
 		A10000190000000000000013 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A20000190000000000000013 /* Assets.xcassets */; };
 		A1000020000000000000001A /* VariableSidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000020000000000000001A /* VariableSidebarView.swift */; };
+		A1000021000000000000001B /* DataTableNSView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000021000000000000001B /* DataTableNSView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -51,6 +52,7 @@
 		A20000180000000000000012 /* blue_marble.jpg */ = {isa = PBXFileReference; lastKnownFileType = image.jpeg; path = blue_marble.jpg; sourceTree = "<group>"; };
 		A20000190000000000000013 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		A2000020000000000000001A /* VariableSidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VariableSidebarView.swift; sourceTree = "<group>"; };
+		A2000021000000000000001B /* DataTableNSView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DataTableNSView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -129,6 +131,7 @@
 			children = (
 				A2000012000000000000000C /* VariableListView.swift */,
 				A2000013000000000000000D /* DataTableView.swift */,
+				A2000021000000000000001B /* DataTableNSView.swift */,
 				A2000014000000000000000E /* FileInfoView.swift */,
 				A2000015000000000000000F /* VectorInspectorView.swift */,
 				A20000160000000000000010 /* TimeSeriesChartView.swift */,
@@ -231,6 +234,7 @@
 				A10000160000000000000010 /* TimeSeriesChartView.swift in Sources */,
 				A10000170000000000000011 /* GlobeView.swift in Sources */,
 				A1000020000000000000001A /* VariableSidebarView.swift in Sources */,
+				A1000021000000000000001B /* DataTableNSView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -5,6 +5,26 @@ All notable changes to CDF Viewer will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2025-02-10
+
+### Added
+
+- NSTableView-based table for smooth scrolling with 86,400+ rows
+- Min-max decimation for charts (preserves peaks and valleys)
+- README with app icon and screenshot
+- Array-based data storage for O(1) access
+
+### Changed
+
+- Cursor now works across full dataset range (not limited to 10,000 rows)
+- Chart hover values now show accurate data (not decimated)
+
+### Performance
+
+- Table scrolling is now smooth with 100k+ rows (native AppKit virtualization)
+- Chart rendering reduced from 86,400 to ~5,000 points while preserving visual accuracy
+- Binary search for cursor date lookup
+
 ## [0.3.0] - 2025-02-10
 
 ### Added

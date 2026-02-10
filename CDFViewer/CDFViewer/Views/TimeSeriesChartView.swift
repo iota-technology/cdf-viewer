@@ -174,26 +174,9 @@ struct TimeSeriesChartView: View {
     // MARK: - Value Display
 
     private func getCurrentValue(for key: String) -> Double? {
-        guard let date = activeDate else { return nil }
-
-        for series in chartSeries {
-            if series.name == key, !series.points.isEmpty {
-                // Find closest point to the active date
-                var closestPoint: ChartPoint?
-                var closestDistance = Double.infinity
-
-                for point in series.points {
-                    let distance = abs(point.date.timeIntervalSince(date))
-                    if distance < closestDistance {
-                        closestDistance = distance
-                        closestPoint = point
-                    }
-                }
-
-                return closestPoint?.value
-            }
-        }
-        return nil
+        // Use viewModel's index-based access for accurate values (not decimated chart data)
+        guard let index = viewModel.cursorIndex else { return nil }
+        return viewModel.value(column: key, at: index)
     }
 
     // MARK: - Data Loading
@@ -228,10 +211,6 @@ struct TimeSeriesChartView: View {
                 // Read timestamps
                 let timestamps = try file.readTimestamps(for: timeVar)
 
-                // Subsample if too many points
-                let maxPoints = 5000
-                let step = max(1, timestamps.count / maxPoints)
-
                 var series: [ChartSeries] = []
 
                 // Group selected components by variable
@@ -253,22 +232,24 @@ struct TimeSeriesChartView: View {
                 for (varName, components) in variableComponents {
                     guard let variable = file.variables.first(where: { $0.name == varName }) else { continue }
                     let values = try file.readDoubles(for: variable)
-                    // Use displayColumnsPerRow for 2D arrays like [86400, 3] - this gives 3, not 259200
                     let elementsPerRecord = variable.displayColumnsPerRow
                     let componentNames = self.componentNames(for: variable)
 
                     for component in components {
                         guard let compIndex = componentNames.firstIndex(of: component) else { continue }
 
-                        var points: [ChartPoint] = []
-                        for i in stride(from: 0, to: timestamps.count, by: step) {
+                        // Extract component values
+                        var componentValues: [Double] = []
+                        componentValues.reserveCapacity(timestamps.count)
+                        for i in 0..<timestamps.count {
                             let valueIndex = i * elementsPerRecord + compIndex
                             if valueIndex < values.count {
-                                let date = Date(timeIntervalSince1970: timestamps[i])
-                                points.append(ChartPoint(date: date, value: values[valueIndex]))
+                                componentValues.append(values[valueIndex])
                             }
                         }
 
+                        // Apply min-max decimation
+                        let points = minMaxDecimate(timestamps: timestamps, values: componentValues, targetPoints: 5000)
                         let seriesName = "\(varName).\(component)"
                         series.append(ChartSeries(name: seriesName, points: points))
                     }
@@ -279,12 +260,8 @@ struct TimeSeriesChartView: View {
                     guard let variable = file.variables.first(where: { $0.name == varName }) else { continue }
                     let values = try file.readDoubles(for: variable)
 
-                    var points: [ChartPoint] = []
-                    for i in stride(from: 0, to: min(timestamps.count, values.count), by: step) {
-                        let date = Date(timeIntervalSince1970: timestamps[i])
-                        points.append(ChartPoint(date: date, value: values[i]))
-                    }
-
+                    // Apply min-max decimation
+                    let points = minMaxDecimate(timestamps: timestamps, values: Array(values.prefix(timestamps.count)), targetPoints: 5000)
                     series.append(ChartSeries(name: varName, points: points))
                 }
 
@@ -296,6 +273,63 @@ struct TimeSeriesChartView: View {
                 isLoading = false
             }
         }
+    }
+
+    /// Min-max decimation: preserves peaks and valleys by keeping min/max per bucket
+    /// Returns approximately targetPoints (can be up to 2x if data is small)
+    private func minMaxDecimate(timestamps: [Double], values: [Double], targetPoints: Int) -> [ChartPoint] {
+        let count = min(timestamps.count, values.count)
+        guard count > 0 else { return [] }
+
+        // If data is small enough, return all points
+        if count <= targetPoints {
+            return (0..<count).map { i in
+                ChartPoint(date: Date(timeIntervalSince1970: timestamps[i]), value: values[i])
+            }
+        }
+
+        // Each bucket produces 2 points (min and max), so use targetPoints/2 buckets
+        let bucketCount = targetPoints / 2
+        let bucketSize = Double(count) / Double(bucketCount)
+
+        var points: [ChartPoint] = []
+        points.reserveCapacity(targetPoints)
+
+        for bucket in 0..<bucketCount {
+            let startIdx = Int(Double(bucket) * bucketSize)
+            let endIdx = min(Int(Double(bucket + 1) * bucketSize), count)
+
+            guard startIdx < endIdx else { continue }
+
+            var minIdx = startIdx
+            var maxIdx = startIdx
+            var minVal = values[startIdx]
+            var maxVal = values[startIdx]
+
+            for i in startIdx..<endIdx {
+                if values[i] < minVal {
+                    minVal = values[i]
+                    minIdx = i
+                }
+                if values[i] > maxVal {
+                    maxVal = values[i]
+                    maxIdx = i
+                }
+            }
+
+            // Add min and max in time order to preserve visual continuity
+            if minIdx <= maxIdx {
+                points.append(ChartPoint(date: Date(timeIntervalSince1970: timestamps[minIdx]), value: minVal))
+                if minIdx != maxIdx {
+                    points.append(ChartPoint(date: Date(timeIntervalSince1970: timestamps[maxIdx]), value: maxVal))
+                }
+            } else {
+                points.append(ChartPoint(date: Date(timeIntervalSince1970: timestamps[maxIdx]), value: maxVal))
+                points.append(ChartPoint(date: Date(timeIntervalSince1970: timestamps[minIdx]), value: minVal))
+            }
+        }
+
+        return points
     }
 
     /// Get the color for a series by name (based on its index in chartSeries)

@@ -15,11 +15,29 @@ final class CDFViewModel {
         didSet { loadTableData() }
     }
 
-    // Table data
+    // Table data - array-based for fast index access (no per-row object allocation)
     private(set) var tableColumns: [DataColumn] = []
-    private(set) var tableRows: [DataRow] = []
     private(set) var isLoadingData = false
     private(set) var dataError: CDFError?
+
+    // Full dataset stored as contiguous arrays for O(1) access
+    private(set) var allTimestamps: [Date] = []
+    private var columnData: [String: [Double]] = [:]
+
+    /// Number of rows available in the table
+    var tableRowCount: Int { allTimestamps.count }
+
+    /// Get timestamp for a row index - O(1)
+    func timestamp(at index: Int) -> Date? {
+        guard index >= 0 && index < allTimestamps.count else { return nil }
+        return allTimestamps[index]
+    }
+
+    /// Get value for a column at row index - O(1)
+    func value(column: String, at index: Int) -> Double? {
+        guard let data = columnData[column], index >= 0 && index < data.count else { return nil }
+        return data[index]
+    }
 
     // Chart selection
     var chartTimeVariable: CDFVariable?
@@ -50,28 +68,40 @@ final class CDFViewModel {
         }
     }
 
-    /// Current cursor as Date, for chart
+    /// Current cursor as Date, for chart - uses full timestamp array
     var cursorDate: Date? {
         get {
-            guard let index = cursorIndex, index < tableRows.count else { return nil }
-            return tableRows[index].timestamp
+            guard let index = cursorIndex, index < allTimestamps.count else { return nil }
+            return allTimestamps[index]
         }
         set {
-            guard let date = newValue, !tableRows.isEmpty else {
+            guard let date = newValue, !allTimestamps.isEmpty else {
                 cursorIndex = nil
                 return
             }
-            // Find closest row to the date
-            var closestIndex = 0
-            var closestDistance = Double.infinity
-            for (i, row) in tableRows.enumerated() {
-                let distance = abs(row.timestamp.timeIntervalSince(date))
-                if distance < closestDistance {
-                    closestDistance = distance
-                    closestIndex = i
+            // Binary search for closest timestamp (array is sorted)
+            let target = date.timeIntervalSince1970
+            var low = 0
+            var high = allTimestamps.count - 1
+
+            while low < high {
+                let mid = (low + high) / 2
+                if allTimestamps[mid].timeIntervalSince1970 < target {
+                    low = mid + 1
+                } else {
+                    high = mid
                 }
             }
-            cursorIndex = closestIndex
+
+            // Check if low-1 is closer
+            if low > 0 {
+                let distLow = abs(allTimestamps[low].timeIntervalSince(date))
+                let distPrev = abs(allTimestamps[low - 1].timeIntervalSince(date))
+                if distPrev < distLow {
+                    low -= 1
+                }
+            }
+            cursorIndex = low
         }
     }
 
@@ -91,9 +121,9 @@ final class CDFViewModel {
         }
     }
 
-    // Total rows for table
+    // Total rows for table - uses actual loaded data count
     var totalRecords: Int {
-        tableTimeVariable?.displayRowCount ?? 0
+        allTimestamps.count
     }
 
     // MARK: - File Loading
@@ -133,7 +163,8 @@ final class CDFViewModel {
         guard let file = cdfFile,
               let timeVar = tableTimeVariable else {
             tableColumns = []
-            tableRows = []
+            allTimestamps = []
+            columnData = [:]
             return
         }
 
@@ -142,8 +173,9 @@ final class CDFViewModel {
 
         Task { @MainActor in
             do {
-                // Read timestamps
-                let timestamps = try file.readTimestamps(for: timeVar)
+                // Read all timestamps (full dataset for cursor sync)
+                let rawTimestamps = try file.readTimestamps(for: timeVar)
+                let timestamps = rawTimestamps.map { Date(timeIntervalSince1970: $0) }
 
                 // Build columns list
                 var columns: [DataColumn] = [
@@ -178,8 +210,8 @@ final class CDFViewModel {
                     columns.append(DataColumn(id: varName, name: varName, key: varName))
                 }
 
-                // Read data for each variable/component
-                var columnData: [String: [Double]] = [:]
+                // Read data for each variable/component into contiguous arrays
+                var newColumnData: [String: [Double]] = [:]
 
                 // Load vector component data
                 for (varName, components) in variableComponents {
@@ -193,14 +225,17 @@ final class CDFViewModel {
                         guard let compIndex = componentNames.firstIndex(of: component) else { continue }
                         let key = "\(varName).\(component)"
 
-                        var componentValues: [Double] = []
+                        // Pre-allocate array for performance
+                        var componentValues = [Double]()
+                        componentValues.reserveCapacity(timestamps.count)
+
                         for i in 0..<timestamps.count {
                             let valueIndex = i * elementsPerRecord + compIndex
                             if valueIndex < values.count {
                                 componentValues.append(values[valueIndex])
                             }
                         }
-                        columnData[key] = componentValues
+                        newColumnData[key] = componentValues
                     }
                 }
 
@@ -208,38 +243,25 @@ final class CDFViewModel {
                 for varName in scalarVariables {
                     guard let variable = file.variables.first(where: { $0.name == varName }) else { continue }
                     let values = try file.readDoubles(for: variable)
-                    columnData[varName] = values
+                    newColumnData[varName] = values
                 }
 
-                // Build rows (limit to first 10000 for performance)
-                let maxRows = min(timestamps.count, 10000)
-                var rows: [DataRow] = []
-
-                for i in 0..<maxRows {
-                    let date = Date(timeIntervalSince1970: timestamps[i])
-                    var values: [String: Double] = [:]
-
-                    for (key, data) in columnData {
-                        if i < data.count {
-                            values[key] = data[i]
-                        }
-                    }
-
-                    rows.append(DataRow(id: i, timestamp: date, values: values))
-                }
-
+                // Store all data - no row object creation needed
                 self.tableColumns = columns
-                self.tableRows = rows
+                self.allTimestamps = timestamps
+                self.columnData = newColumnData
                 isLoadingData = false
             } catch let error as CDFError {
                 dataError = error
                 tableColumns = []
-                tableRows = []
+                allTimestamps = []
+                columnData = [:]
                 isLoadingData = false
             } catch {
                 dataError = .corruptedData(error.localizedDescription)
                 tableColumns = []
-                tableRows = []
+                allTimestamps = []
+                columnData = [:]
                 isLoadingData = false
             }
         }
@@ -305,19 +327,19 @@ final class CDFViewModel {
     // MARK: - Export
 
     func exportTableAsCSV() throws -> String {
-        guard !tableColumns.isEmpty, !tableRows.isEmpty else {
+        guard !tableColumns.isEmpty, !allTimestamps.isEmpty else {
             throw CDFError.dataReadFailed(variable: "table", reason: "No data to export")
         }
 
         var csv = tableColumns.map { $0.name }.joined(separator: ",") + "\n"
 
-        for row in tableRows {
+        for i in 0..<allTimestamps.count {
             var values: [String] = []
             for column in tableColumns {
                 if column.key == "time" {
-                    values.append(row.timestamp.ISO8601Format())
-                } else if let value = row.values[column.key] {
-                    values.append(formatValue(value))
+                    values.append(allTimestamps[i].ISO8601Format())
+                } else if let val = value(column: column.key, at: i) {
+                    values.append(formatValue(val))
                 } else {
                     values.append("")
                 }
@@ -343,10 +365,4 @@ struct DataColumn: Identifiable {
     let id: String
     let name: String
     let key: String
-}
-
-struct DataRow: Identifiable {
-    let id: Int
-    let timestamp: Date
-    let values: [String: Double]
 }
