@@ -7,8 +7,10 @@ macOS app for viewing NASA CDF (Common Data Format) files with data tables, time
 ```bash
 cd CDFViewer
 xcodebuild -scheme CDFViewer -configuration Debug build
-open ~/Library/Developer/Xcode/DerivedData/CDFViewer-*/Build/Products/Debug/CDFViewer.app
+pkill -x "CDFViewer"; sleep 0.5; open ~/Library/Developer/Xcode/DerivedData/CDFViewer-*/Build/Products/Debug/CDFViewer.app
 ```
+
+**Important**: Always kill existing instances before opening a new build to ensure changes are visible. The `sleep 0.5` prevents race conditions with macOS app cleanup.
 
 For release builds: `xcodebuild -scheme CDFViewer -configuration Release build`
 
@@ -163,6 +165,41 @@ VStack {
 }
 .clipped()
 ```
+
+## Unified Sidebar (NavigationSidebarContainer)
+
+**All three views use NavigationSidebarContainer for consistent sidebar styling.** The sidebar toggle uses a pure SwiftUI approach that's iPad-compatible.
+
+### Required Pattern
+
+```swift
+var body: some View {
+    NavigationSplitView(columnVisibility: $columnVisibility) {
+        NavigationSidebarContainer(sidebarBackground: .black /* optional */) {
+            sidebarView
+        }
+        .navigationSplitViewColumnWidth(min: 200, ideal: 280, max: 400)
+    } detail: {
+        detailView
+    }
+    .sidebarToggleToolbar()  // Adds left-aligned toggle button
+    .toolbar(removing: .sidebarToggle)  // Removes SwiftUI's default right-aligned toggle
+    .toolbarBackground(.hidden, for: .windowToolbar)  // Enables Liquid Glass flow
+}
+```
+
+### How It Works
+
+1. **NavigationSidebarContainer** wraps sidebar content for consistent styling (e.g., background color for Globe)
+2. **sidebarToggleToolbar()** adds a left-aligned toggle button using `NSSplitViewController.toggleSidebar(_:)` action
+3. **toolbar(removing: .sidebarToggle)** removes SwiftUI's default right-aligned toggle to avoid duplicates
+4. **toolbarBackground(.hidden)** allows Liquid Glass to flow across the entire title bar
+
+### DO NOT
+
+- Use NSToolbar's `.toggleSidebar` item (conflicts with SwiftUI toolbar)
+- Forget `.toolbar(removing: .sidebarToggle)` (causes duplicate buttons)
+- Forget `.toolbarBackground(.hidden, for: .windowToolbar)` (breaks Liquid Glass)
 
 ## CLAUDE.md Maintenance
 

@@ -8,6 +8,9 @@ struct TimeSeriesChartView: View {
     @State private var selectedTimeVariable: CDFVariable?
     @State private var selectedComponents: Set<String> = [] // "varName" or "varName.X"
 
+    // Sidebar visibility (Photos-style toggle)
+    @State private var columnVisibility: NavigationSplitViewVisibility = .all
+
     // Chart data
     @State private var chartSeries: [ChartSeries] = []
     @State private var isLoading = false
@@ -19,15 +22,18 @@ struct TimeSeriesChartView: View {
     }
 
     var body: some View {
-        NavigationSplitView {
-            // Sidebar using reusable component
-            sidebarView
-                .navigationSplitViewColumnWidth(min: 200, ideal: 280, max: 400)
+        NavigationSplitView(columnVisibility: $columnVisibility) {
+            NavigationSidebarContainer {
+                sidebarView
+            }
+            .navigationSplitViewColumnWidth(min: 200, ideal: 280, max: 400)
         } detail: {
             // Chart area
             chartAreaView
-                .toolbarBackground(.hidden, for: .windowToolbar)
         }
+        .sidebarToggleToolbar()
+        .toolbar(removing: .sidebarToggle)
+        .toolbarBackground(.hidden, for: .windowToolbar)
         .onAppear {
             setupInitialSelection()
         }

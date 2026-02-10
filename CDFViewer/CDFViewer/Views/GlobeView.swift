@@ -8,6 +8,9 @@ struct GlobeView: View {
     @State private var selectedTimeVariable: CDFVariable?
     @State private var selectedPositionVariables: Set<String> = []  // Variable names
 
+    // Sidebar visibility (Photos-style toggle)
+    @State private var columnVisibility: NavigationSplitViewVisibility = .all
+
     // Globe data - supports multiple tracks
     @State private var tracks: [String: [(x: Double, y: Double, z: Double)]] = [:]  // varName -> positions
     @State private var timestamps: [Date] = []
@@ -51,14 +54,16 @@ struct GlobeView: View {
     }
 
     var body: some View {
-        NavigationSplitView {
-            sidebarView
-                .navigationSplitViewColumnWidth(min: 200, ideal: 280, max: 400)
-                .scrollContentBackground(.hidden)
-                .background(.black)
+        NavigationSplitView(columnVisibility: $columnVisibility) {
+            NavigationSidebarContainer(sidebarBackground: .black) {
+                sidebarView
+            }
+            .navigationSplitViewColumnWidth(min: 200, ideal: 280, max: 400)
         } detail: {
             globeAreaView
         }
+        .sidebarToggleToolbar()
+        .toolbar(removing: .sidebarToggle)
         .toolbarBackground(.hidden, for: .windowToolbar)
         .onAppear {
             setupInitialSelection()

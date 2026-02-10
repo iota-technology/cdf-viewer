@@ -64,6 +64,13 @@ class CDFNSDocument: NSDocument {
         window.titlebarAppearsTransparent = false
         window.toolbarStyle = .unified
 
+        // Configure toolbar with sidebar toggle for Liquid Glass
+        let toolbar = NSToolbar(identifier: "DocumentToolbar")
+        toolbar.displayMode = .iconOnly
+        toolbar.showsBaselineSeparator = false
+        toolbar.delegate = ToolbarDelegate.shared
+        window.toolbar = toolbar
+
         let windowController = NSWindowController(window: window)
         windowController.contentViewController = hostingController
         addWindowController(windowController)
@@ -86,6 +93,7 @@ class CDFNSDocument: NSDocument {
 struct DocumentContentView: View {
     @ObservedObject var documentWrapper: DocumentWrapper
     @State private var showFileInfo = false
+    @State private var columnVisibility: NavigationSplitViewVisibility = .all
     @Environment(\.openWindow) private var openWindow
 
     init(document: CDFNSDocument) {
@@ -93,9 +101,11 @@ struct DocumentContentView: View {
     }
 
     var body: some View {
-        NavigationSplitView {
-            VariableListView(viewModel: documentWrapper.viewModel)
-                .navigationSplitViewColumnWidth(min: 200, ideal: 250, max: 350)
+        NavigationSplitView(columnVisibility: $columnVisibility) {
+            NavigationSidebarContainer {
+                VariableListView(viewModel: documentWrapper.viewModel)
+            }
+            .navigationSplitViewColumnWidth(min: 200, ideal: 250, max: 350)
         } detail: {
             if documentWrapper.document.loadError != nil {
                 ErrorView(error: documentWrapper.document.loadError!)
@@ -103,6 +113,8 @@ struct DocumentContentView: View {
                 DataTableView(viewModel: documentWrapper.viewModel)
             }
         }
+        .sidebarToggleToolbar()
+        .toolbar(removing: .sidebarToggle)
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
                 Button {
@@ -135,6 +147,7 @@ struct DocumentContentView: View {
             }
         }
         .navigationTitle(documentWrapper.document.cdfFile?.fileName ?? "CDF Viewer")
+        .toolbarBackground(.hidden, for: .windowToolbar)
     }
 
     private func openAuxiliaryWindow(id: String) {
@@ -161,4 +174,22 @@ class DocumentWrapper: ObservableObject {
 
 extension Notification.Name {
     static let openAuxiliaryWindow = Notification.Name("openAuxiliaryWindow")
+}
+
+// MARK: - Toolbar Delegate (empty - SwiftUI handles all toolbar items)
+
+class ToolbarDelegate: NSObject, NSToolbarDelegate {
+    static let shared = ToolbarDelegate()
+
+    func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
+        [.flexibleSpace]
+    }
+
+    func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
+        [.flexibleSpace, .space]
+    }
+
+    func toolbar(_ toolbar: NSToolbar, itemForItemIdentifier itemIdentifier: NSToolbarItem.Identifier, willBeInsertedIntoToolbar flag: Bool) -> NSToolbarItem? {
+        nil
+    }
 }

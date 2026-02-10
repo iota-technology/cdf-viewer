@@ -106,11 +106,30 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         globeWindows[id] = window
     }
 
-    /// Configure an empty toolbar for Liquid Glass title bar integration
+    /// Configure toolbar with sidebar toggle for Liquid Glass title bar integration
     private func configureToolbar(for window: NSWindow, identifier: String) {
         let toolbar = NSToolbar(identifier: identifier)
         toolbar.displayMode = .iconOnly
         toolbar.showsBaselineSeparator = false
+        toolbar.delegate = AuxiliaryToolbarDelegate.shared
         window.toolbar = toolbar
+    }
+}
+
+// MARK: - Auxiliary Window Toolbar Delegate (empty - SwiftUI handles all toolbar items)
+
+class AuxiliaryToolbarDelegate: NSObject, NSToolbarDelegate {
+    static let shared = AuxiliaryToolbarDelegate()
+
+    func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
+        [.flexibleSpace]
+    }
+
+    func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
+        [.flexibleSpace, .space]
+    }
+
+    func toolbar(_ toolbar: NSToolbar, itemForItemIdentifier itemIdentifier: NSToolbarItem.Identifier, willBeInsertedIntoToolbar flag: Bool) -> NSToolbarItem? {
+        nil
     }
 }
