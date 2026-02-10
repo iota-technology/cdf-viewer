@@ -37,54 +37,56 @@ struct GlobeView: View {
 
     var body: some View {
         HSplitView {
-                // Controls sidebar
-                VStack(alignment: .leading, spacing: 16) {
-                    // Position variable selector
-                    GroupBox("ECEF Position Variable") {
-                        if let file = viewModel.cdfFile {
-                            Picker("Position", selection: $selectedPositionVariable) {
-                                Text("Select...").tag(nil as CDFVariable?)
-                                ForEach(file.ecefPositionVariables()) { variable in
-                                    Text(variable.name).tag(variable as CDFVariable?)
-                                }
+                // Controls sidebar using reusable component
+                VStack(alignment: .leading, spacing: 0) {
+                    VariableSidebarView(
+                        title: "ECEF Position",
+                        variables: viewModel.cdfFile?.ecefPositionVariables() ?? [],
+                        selection: $selectedPositionVariable,
+                        showDataTypeInfo: true
+                    )
+
+                    Divider()
+                        .padding(.vertical, 8)
+
+                    // Load button and controls
+                    VStack(alignment: .leading, spacing: 16) {
+                        Button(action: loadPositions) {
+                            if isLoading {
+                                ProgressView()
+                                    .scaleEffect(0.7)
+                            } else {
+                                Label("Load Track", systemImage: "globe")
                             }
-                            .labelsHidden()
                         }
-                    }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(selectedPositionVariable == nil || isLoading)
+                        .padding(.horizontal, 12)
 
-                    // Load button
-                    Button(action: loadPositions) {
-                        if isLoading {
-                            ProgressView()
-                                .scaleEffect(0.7)
-                        } else {
-                            Label("Load Track", systemImage: "globe")
-                        }
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(selectedPositionVariable == nil || isLoading)
-
-                    // Stats
-                    if !positions.isEmpty {
-                        GroupBox("Track Info") {
+                        // Stats
+                        if !positions.isEmpty {
                             VStack(alignment: .leading, spacing: 4) {
+                                Text("Track Info")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+
                                 Text("\(positions.count) points")
                                 if let first = positions.first, let last = positions.last {
                                     let startAlt = altitude(x: first.x, y: first.y, z: first.z)
                                     let endAlt = altitude(x: last.x, y: last.y, z: last.z)
-                                    Text("Start altitude: \(formatKm(startAlt))")
-                                    Text("End altitude: \(formatKm(endAlt))")
+                                    Text("Start: \(formatKm(startAlt))")
+                                    Text("End: \(formatKm(endAlt))")
                                 }
                             }
-                            .font(.caption)
+                            .font(.system(size: 11))
                             .foregroundStyle(.secondary)
+                            .padding(.horizontal, 12)
                         }
-                    }
 
-                    Spacer()
+                        Spacer()
+                    }
                 }
-                .padding()
-                .frame(width: 220)
+                .frame(width: 240)
 
                 // 3D Scene
                 VStack {
