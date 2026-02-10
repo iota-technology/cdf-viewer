@@ -37,6 +37,7 @@ jobs:
           xcodebuild -scheme CDFViewer \
             -configuration Release \
             -derivedDataPath build \
+            clean \
             -archivePath build/CDFViewer.xcarchive \
             archive \
             CODE_SIGN_IDENTITY="-" \

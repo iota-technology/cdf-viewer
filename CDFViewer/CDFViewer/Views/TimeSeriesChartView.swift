@@ -26,6 +26,7 @@ struct TimeSeriesChartView: View {
         } detail: {
             // Chart area
             chartAreaView
+                .toolbarBackground(.hidden, for: .windowToolbar)
         }
         .onAppear {
             setupInitialSelection()

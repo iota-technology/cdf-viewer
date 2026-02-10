@@ -76,6 +76,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         window.title = "Time Series Chart"
         window.styleMask.insert(.fullSizeContentView)
         window.toolbarStyle = .unified
+        configureToolbar(for: window, identifier: "ChartToolbar")
 
         window.makeKeyAndOrderFront(nil)
         chartWindows[id] = window
@@ -98,8 +99,18 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         window.styleMask.insert(.fullSizeContentView)
         window.toolbarStyle = .unified
         window.backgroundColor = .black
+        window.titlebarAppearsTransparent = true
+        configureToolbar(for: window, identifier: "GlobeToolbar")
 
         window.makeKeyAndOrderFront(nil)
         globeWindows[id] = window
+    }
+
+    /// Configure an empty toolbar for Liquid Glass title bar integration
+    private func configureToolbar(for window: NSWindow, identifier: String) {
+        let toolbar = NSToolbar(identifier: identifier)
+        toolbar.displayMode = .iconOnly
+        toolbar.showsBaselineSeparator = false
+        window.toolbar = toolbar
     }
 }

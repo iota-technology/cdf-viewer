@@ -191,6 +191,7 @@
 				A70000010000000000000001 /* Sources */,
 				A30000010000000000000001 /* Frameworks */,
 				A70000020000000000000002 /* Resources */,
+				A70000030000000000000003 /* Set Version from Git Tag */,
 			);
 			buildRules = (
 			);
@@ -280,6 +281,23 @@
 		};
 /* End PBXResourcesBuildPhase section */
 
+/* Begin PBXShellScriptBuildPhase section */
+		A70000030000000000000003 /* Set Version from Git Tag */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			name = "Set Version from Git Tag";
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/bash;
+			shellScript = "# Get version from latest git tag (strips 'v' prefix)\nVERSION=$(git describe --tags --abbrev=0 2>/dev/null | sed 's/^v//')\nif [ -z \"$VERSION\" ]; then\n    VERSION=\"0.0.0-dev\"\nfi\n\n# Get short git SHA for build number\nGIT_SHA=$(git rev-parse --short HEAD 2>/dev/null)\nif [ -z \"$GIT_SHA\" ]; then\n    GIT_SHA=\"unknown\"\nfi\n\nPLIST=\"${TARGET_BUILD_DIR}/${INFOPLIST_PATH}\"\n\n# Update version (delete first to handle both add/update cases)\n/usr/libexec/PlistBuddy -c \"Delete :CFBundleShortVersionString\" \"$PLIST\" 2>/dev/null || true\n/usr/libexec/PlistBuddy -c \"Add :CFBundleShortVersionString string $VERSION\" \"$PLIST\"\n\n# Update build number\n/usr/libexec/PlistBuddy -c \"Delete :CFBundleVersion\" \"$PLIST\" 2>/dev/null || true\n/usr/libexec/PlistBuddy -c \"Add :CFBundleVersion string $GIT_SHA\" \"$PLIST\"\n";
+		};
+/* End PBXShellScriptBuildPhase section */
+
 /* Begin XCBuildConfiguration section */
 		A90000010000000000000001 /* Debug */ = {
 			isa = XCBuildConfiguration;
@@ -318,7 +336,7 @@
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
-				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
 				GCC_DYNAMIC_NO_PIC = NO;
 				GCC_NO_COMMON_BLOCKS = YES;
@@ -380,7 +398,7 @@
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
-				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
 				GCC_NO_COMMON_BLOCKS = YES;
 				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
@@ -417,7 +435,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 0.4.4;
 				PRODUCT_BUNDLE_IDENTIFIER = com.example.CDFViewer;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -445,7 +463,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 0.4.4;
 				PRODUCT_BUNDLE_IDENTIFIER = com.example.CDFViewer;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
