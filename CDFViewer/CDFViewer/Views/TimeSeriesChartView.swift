@@ -4,11 +4,6 @@ import Charts
 struct TimeSeriesChartView: View {
     @Bindable var viewModel: CDFViewModel
 
-    // Color palette matching Swift Charts default
-    private static let chartColors: [Color] = [
-        .blue, .orange, .green, .red, .purple, .brown, .pink, .gray, .cyan, .yellow
-    ]
-
     // Selection state
     @State private var selectedTimeVariable: CDFVariable?
     @State private var selectedComponents: Set<String> = [] // "varName" or "varName.X"
@@ -28,16 +23,11 @@ struct TimeSeriesChartView: View {
         isPaused ? pausedDate : hoverDate
     }
 
-    // Reference series (the one with most points) for lookups
-    private var referenceSeries: ChartSeries? {
-        chartSeries.max(by: { $0.points.count < $1.points.count })
-    }
-
     var body: some View {
         NavigationSplitView {
-            // Sidebar
+            // Sidebar using reusable component
             sidebarView
-                .navigationSplitViewColumnWidth(min: 200, ideal: 250, max: 350)
+                .navigationSplitViewColumnWidth(min: 200, ideal: 280, max: 400)
         } detail: {
             // Chart area
             chartAreaView
@@ -56,234 +46,45 @@ struct TimeSeriesChartView: View {
     // MARK: - Sidebar
 
     private var sidebarView: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            // Time Variables section
-            Text("Time Variable")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, 12)
-                .padding(.top, 12)
-                .padding(.bottom, 4)
-
-            if let file = viewModel.cdfFile {
-                let timeVars = file.timestampVariables()
-                ForEach(timeVars) { variable in
-                    timeVariableRow(variable)
-                }
-
-                if timeVars.isEmpty {
-                    Text("No time variables found")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 8)
-                }
-            }
-
-            // Divider
-            Divider()
-                .padding(.vertical, 8)
-
-            // Data Variables section
-            Text("Data Variables")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, 12)
-                .padding(.bottom, 4)
-
-            ScrollView {
-                VStack(alignment: .leading, spacing: 2) {
-                    if let file = viewModel.cdfFile {
-                        let numericVars = file.numericVariables()
-                        ForEach(numericVars) { variable in
-                            dataVariableRow(variable)
-                        }
-
-                        if numericVars.isEmpty {
-                            Text("No numeric variables found")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 8)
+        VariableSidebarView(
+            singleSelection: $selectedTimeVariable,
+            multiSelection: $selectedComponents,
+            sections: sidebarSections,
+            showDataTypeInfo: true,
+            colorForKey: seriesColor,
+            valueForKey: getCurrentValue,
+            singleSelectionTrailing: { variable in
+                // Show timestamp for selected time variable when hovering
+                if selectedTimeVariable == variable, let date = activeDate {
+                    HStack(spacing: 4) {
+                        Text(date, format: .dateTime.month().day().hour().minute().second())
+                            .font(.system(size: 11, design: .monospaced))
+                            .foregroundStyle(.secondary)
+                        if isPaused {
+                            Image(systemName: "pause.fill")
+                                .font(.system(size: 9))
+                                .foregroundStyle(.orange)
                         }
                     }
                 }
             }
-        }
+        )
     }
 
-    private func timeVariableRow(_ variable: CDFVariable) -> some View {
-        HStack {
-            Image(systemName: selectedTimeVariable == variable ? "largecircle.fill.circle" : "circle")
-                .foregroundStyle(selectedTimeVariable == variable ? .blue : .secondary)
-                .font(.system(size: 12))
-
-            Text(variable.name)
-                .font(.system(size: 13))
-
-            Spacer()
-
-            // Show current timestamp on hover (only for selected time variable)
-            if selectedTimeVariable == variable,
-               let date = activeDate {
-                HStack(spacing: 4) {
-                    Text(date, format: .dateTime.month().day().hour().minute().second())
-                        .font(.system(size: 11, design: .monospaced))
-                        .foregroundStyle(.secondary)
-                    if isPaused {
-                        Image(systemName: "pause.fill")
-                            .font(.system(size: 9))
-                            .foregroundStyle(.orange)
-                    }
-                }
-            }
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 6)
-        .contentShape(Rectangle())
-        .onTapGesture {
-            selectedTimeVariable = variable
-        }
-    }
-
-    private func dataVariableRow(_ variable: CDFVariable) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            // Main variable row
-            HStack {
-                // Checkbox for parent variable
-                let isAnySelected = isVariableOrComponentSelected(variable)
-                Image(systemName: isAnySelected ? "checkmark.square.fill" : "square")
-                    .foregroundStyle(isAnySelected ? .blue : .secondary)
-                    .font(.system(size: 12))
-
-                Text(variable.name)
-                    .font(.system(size: 13))
-
-                Spacer()
-
-                // Show value on hover (for scalar variables only)
-                if !variable.isVector, let value = getCurrentValue(for: variable.name) {
-                    Text(formatValue(value))
-                        .font(.system(size: 11, design: .monospaced))
-                        .foregroundStyle(.secondary)
-                }
-
-                // Color indicator for scalar variables
-                if !variable.isVector, let color = seriesColor(for: variable.name) {
-                    Circle()
-                        .fill(color)
-                        .frame(width: 8, height: 8)
-                }
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
-            .contentShape(Rectangle())
-            .onTapGesture {
-                toggleVariable(variable)
-            }
-
-            // Component sub-items for vectors
-            if variable.isVector {
-                let components = componentNames(for: variable)
-                ForEach(components, id: \.self) { component in
-                    componentRow(variable: variable, component: component)
-                }
-            }
-        }
-    }
-
-    private func componentRow(variable: CDFVariable, component: String) -> some View {
-        let key = "\(variable.name).\(component)"
-        let isSelected = selectedComponents.contains(key)
-
-        return HStack {
-            Image(systemName: isSelected ? "checkmark.square.fill" : "square")
-                .foregroundStyle(isSelected ? .blue : .secondary)
-                .font(.system(size: 11))
-
-            Text(component)
-                .font(.system(size: 12))
-                .foregroundStyle(.secondary)
-
-            Spacer()
-
-            // Show value on hover
-            if let value = getCurrentValue(for: key) {
-                Text(formatValue(value))
-                    .font(.system(size: 11, design: .monospaced))
-                    .foregroundStyle(.secondary)
-            }
-
-            // Color indicator
-            if let color = seriesColor(for: key) {
-                Circle()
-                    .fill(color)
-                    .frame(width: 8, height: 8)
-            }
-        }
-        .padding(.leading, 32)
-        .padding(.trailing, 12)
-        .padding(.vertical, 4)
-        .contentShape(Rectangle())
-        .onTapGesture {
-            toggleComponent(key)
-        }
-    }
-
-    private func componentNames(for variable: CDFVariable) -> [String] {
-        let count = variable.totalElements
-        if count == 3 {
-            return ["X", "Y", "Z"]
-        } else if count == 2 {
-            return ["X", "Y"]
-        } else {
-            return (0..<min(count, 10)).map { "[\($0)]" }
-        }
-    }
-
-    // MARK: - Selection Logic
-
-    private func isVariableOrComponentSelected(_ variable: CDFVariable) -> Bool {
-        if variable.isVector {
-            let components = componentNames(for: variable)
-            return components.contains { selectedComponents.contains("\(variable.name).\($0)") }
-        } else {
-            return selectedComponents.contains(variable.name)
-        }
-    }
-
-    private func toggleVariable(_ variable: CDFVariable) {
-        if variable.isVector {
-            let components = componentNames(for: variable)
-            let keys = components.map { "\(variable.name).\($0)" }
-            let allSelected = keys.allSatisfy { selectedComponents.contains($0) }
-
-            if allSelected {
-                // Deselect all
-                for key in keys {
-                    selectedComponents.remove(key)
-                }
-            } else {
-                // Select all
-                for key in keys {
-                    selectedComponents.insert(key)
-                }
-            }
-        } else {
-            if selectedComponents.contains(variable.name) {
-                selectedComponents.remove(variable.name)
-            } else {
-                selectedComponents.insert(variable.name)
-            }
-        }
-    }
-
-    private func toggleComponent(_ key: String) {
-        if selectedComponents.contains(key) {
-            selectedComponents.remove(key)
-        } else {
-            selectedComponents.insert(key)
-        }
+    private var sidebarSections: [VariableSectionConfig] {
+        guard let file = viewModel.cdfFile else { return [] }
+        return [
+            VariableSectionConfig(
+                title: "Time Variable",
+                variables: file.timestampVariables(),
+                selectionMode: .single
+            ),
+            VariableSectionConfig(
+                title: "Data Variables",
+                variables: file.numericVariables(),
+                selectionMode: .multi
+            )
+        ]
     }
 
     // MARK: - Chart Area
@@ -322,7 +123,7 @@ struct TimeSeriesChartView: View {
                         y: .value(series.name, point.value),
                         series: .value("Series", series.name)
                     )
-                    .foregroundStyle(Self.chartColors[index % Self.chartColors.count])
+                    .foregroundStyle(chartColorPalette[index % chartColorPalette.count])
                 }
             }
 
@@ -510,20 +311,24 @@ struct TimeSeriesChartView: View {
         }
     }
 
-    private func formatValue(_ value: Double) -> String {
-        if abs(value) >= 1e6 || (abs(value) < 1e-3 && value != 0) {
-            return String(format: "%.2e", value)
-        } else {
-            return String(format: "%.2f", value)
-        }
-    }
-
     /// Get the color for a series by name (based on its index in chartSeries)
     private func seriesColor(for name: String) -> Color? {
         guard let index = chartSeries.firstIndex(where: { $0.name == name }) else {
             return nil
         }
-        return Self.chartColors[index % Self.chartColors.count]
+        return chartColorPalette[index % chartColorPalette.count]
+    }
+
+    /// Get component names for a vector variable
+    private func componentNames(for variable: CDFVariable) -> [String] {
+        let count = variable.totalElements
+        if count == 3 {
+            return ["X", "Y", "Z"]
+        } else if count == 2 {
+            return ["X", "Y"]
+        } else {
+            return (0..<min(count, 10)).map { "[\($0)]" }
+        }
     }
 }
 

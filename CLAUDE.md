@@ -45,6 +45,42 @@ The workflow builds an unsigned app zip and creates a GitHub release.
 
 **Unsigned app quarantine**: Downloaded unsigned apps get quarantined by macOS, showing "damaged and can't be opened". Users must run `xattr -cr /path/to/App.app` before opening.
 
+**Swift Charts LineMark series**: When plotting multiple data series, you MUST include `series: .value("Series", seriesName)` parameter. Without it, SwiftUI Charts connects all points as one continuous line regardless of foregroundStyle color.
+
+```swift
+// Bad - all points connected as one line
+LineMark(x: .value("Time", point.date), y: .value("Value", point.value))
+    .foregroundStyle(color)
+
+// Good - separate lines per series
+LineMark(x: .value("Time", point.date), y: .value("Value", point.value),
+         series: .value("Series", series.name))
+    .foregroundStyle(color)
+```
+
+**Swift Charts hover coordinates**: The `chartOverlay` coordinates include the y-axis label area, but `proxy.value(atX:)` expects plot-area-relative coordinates. You must offset by the plot frame origin:
+
+```swift
+.chartOverlay { proxy in
+    GeometryReader { geometry in
+        Rectangle().fill(.clear).contentShape(Rectangle())
+            .onContinuousHover { phase in
+                if case .active(let location) = phase,
+                   let plotFrame = proxy.plotFrame {
+                    let plotRect = geometry[plotFrame]
+                    let adjustedX = location.x - plotRect.origin.x
+                    // Use adjustedX with proxy.value(atX:)
+                }
+            }
+    }
+}
+```
+
+**Xcode project file structure**: When adding new Swift files to an Xcode project, you need to add entries in THREE places in `project.pbxproj`:
+1. `PBXBuildFile` section - references the file for compilation
+2. `PBXFileReference` section - defines the file itself
+3. `PBXGroup` section - adds file to the appropriate folder/group in the navigator
+
 ## CLAUDE.md Maintenance
 
 **Keep this file lean.** Only include:
