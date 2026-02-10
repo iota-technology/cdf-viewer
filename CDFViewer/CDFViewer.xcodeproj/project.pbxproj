@@ -28,6 +28,11 @@
 		A10000190000000000000013 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A20000190000000000000013 /* Assets.xcassets */; };
 		A1000020000000000000001A /* VariableSidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000020000000000000001A /* VariableSidebarView.swift */; };
 		A1000021000000000000001B /* DataTableNSView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000021000000000000001B /* DataTableNSView.swift */; };
+		A1000022000000000000001C /* CDFNSDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000022000000000000001C /* CDFNSDocument.swift */; };
+		A1000023000000000000001D /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000023000000000000001D /* AppDelegate.swift */; };
+		A1000024000000000000001E /* URL+ExtendedAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000024000000000000001E /* URL+ExtendedAttributes.swift */; };
+		A1000025000000000000001F /* VariableMetadata.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000025000000000000001F /* VariableMetadata.swift */; };
+		A10000260000000000000020 /* VariableInfoPopover.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000260000000000000020 /* VariableInfoPopover.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -53,6 +58,11 @@
 		A20000190000000000000013 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		A2000020000000000000001A /* VariableSidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VariableSidebarView.swift; sourceTree = "<group>"; };
 		A2000021000000000000001B /* DataTableNSView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DataTableNSView.swift; sourceTree = "<group>"; };
+		A2000022000000000000001C /* CDFNSDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CDFNSDocument.swift; sourceTree = "<group>"; };
+		A2000023000000000000001D /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		A2000024000000000000001E /* URL+ExtendedAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "URL+ExtendedAttributes.swift"; sourceTree = "<group>"; };
+		A2000025000000000000001F /* VariableMetadata.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VariableMetadata.swift; sourceTree = "<group>"; };
+		A20000260000000000000020 /* VariableInfoPopover.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VariableInfoPopover.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -82,9 +92,18 @@
 				A40000060000000000000006 /* Models */,
 				A40000070000000000000007 /* Views */,
 				A40000080000000000000008 /* ViewModels */,
+				A4000010000000000000000A /* Extensions */,
 				A40000090000000000000009 /* Resources */,
 			);
 			path = CDFViewer;
+			sourceTree = "<group>";
+		};
+		A4000010000000000000000A /* Extensions */ = {
+			isa = PBXGroup;
+			children = (
+				A2000024000000000000001E /* URL+ExtendedAttributes.swift */,
+			);
+			path = Extensions;
 			sourceTree = "<group>";
 		};
 		A40000030000000000000003 /* Products */ = {
@@ -100,6 +119,8 @@
 			children = (
 				A20000010000000000000001 /* CDFViewerApp.swift */,
 				A20000020000000000000002 /* ContentView.swift */,
+				A2000022000000000000001C /* CDFNSDocument.swift */,
+				A2000023000000000000001D /* AppDelegate.swift */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -122,6 +143,7 @@
 				A20000080000000000000008 /* CDFFile.swift */,
 				A20000090000000000000009 /* CDFVariable.swift */,
 				A2000010000000000000000A /* CDFError.swift */,
+				A2000025000000000000001F /* VariableMetadata.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -137,6 +159,7 @@
 				A20000160000000000000010 /* TimeSeriesChartView.swift */,
 				A20000170000000000000011 /* GlobeView.swift */,
 				A2000020000000000000001A /* VariableSidebarView.swift */,
+				A20000260000000000000020 /* VariableInfoPopover.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -235,6 +258,11 @@
 				A10000170000000000000011 /* GlobeView.swift in Sources */,
 				A1000020000000000000001A /* VariableSidebarView.swift in Sources */,
 				A1000021000000000000001B /* DataTableNSView.swift in Sources */,
+				A1000022000000000000001C /* CDFNSDocument.swift in Sources */,
+				A1000023000000000000001D /* AppDelegate.swift in Sources */,
+				A1000024000000000000001E /* URL+ExtendedAttributes.swift in Sources */,
+				A1000025000000000000001F /* VariableMetadata.swift in Sources */,
+				A10000260000000000000020 /* VariableInfoPopover.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

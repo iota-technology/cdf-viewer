@@ -15,6 +15,8 @@
 			<array>
 				<string>gov.nasa.gsfc.cdf</string>
 			</array>
+			<key>NSDocumentClass</key>
+			<string>$(PRODUCT_MODULE_NAME).CDFNSDocument</string>
 		</dict>
 	</array>
 	<key>UTImportedTypeDeclarations</key>

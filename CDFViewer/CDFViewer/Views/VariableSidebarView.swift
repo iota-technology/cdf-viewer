@@ -35,6 +35,15 @@ struct VariableSidebarView<TrailingContent: View>: View {
     /// Returns the current hover value for a component key (nil = don't show)
     var valueForKey: ((String) -> Double?)?
 
+    /// Callback when info button is tapped on a variable (for external handling)
+    var onInfoTapped: ((CDFVariable) -> Void)?
+
+    /// View model for info popover (if provided, popover is shown internally)
+    var viewModel: CDFViewModel?
+
+    /// Whether to show positional toggle in info popover (Globe view only)
+    var showPositionalToggle: Bool = false
+
     /// Whether to show data type and record count under variable names
     var showDataTypeInfo: Bool = true
 
@@ -44,6 +53,9 @@ struct VariableSidebarView<TrailingContent: View>: View {
 
     /// Optional trailing content for single selection rows (e.g., timestamp display)
     @ViewBuilder var singleSelectionTrailing: (CDFVariable) -> TrailingContent
+
+    // Internal state for info popover
+    @State private var infoPopoverVariable: CDFVariable?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -104,19 +116,50 @@ struct VariableSidebarView<TrailingContent: View>: View {
         let disabled = isDisabled?(variable) ?? false
 
         return HStack {
-            Image(systemName: isSelected ? "largecircle.fill.circle" : "circle")
-                .foregroundStyle(disabled ? Color.gray.opacity(0.3) : (isSelected ? Color.blue : Color.secondary))
-                .font(.system(size: 12))
+            HStack {
+                Image(systemName: isSelected ? "largecircle.fill.circle" : "circle")
+                    .foregroundStyle(disabled ? Color.gray.opacity(0.3) : (isSelected ? Color.blue : Color.secondary))
+                    .font(.system(size: 12))
 
-            VStack(alignment: .leading, spacing: 1) {
-                Text(variable.name)
-                    .font(.system(size: 13))
-                    .foregroundStyle(disabled ? .secondary : .primary)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(variable.name)
+                        .font(.system(size: 13))
+                        .foregroundStyle(disabled ? .secondary : .primary)
 
-                if showDataTypeInfo {
-                    Text("\(variable.dataType.displayName) [\(variable.recordCount)]")
-                        .font(.system(size: 10))
-                        .foregroundStyle(.tertiary)
+                    if showDataTypeInfo {
+                        Text("\(variable.dataType.displayName) [\(variable.recordCount)]")
+                            .font(.system(size: 10))
+                            .foregroundStyle(.tertiary)
+                    }
+                }
+            }
+            .opacity(disabled ? 0.5 : 1.0)
+
+            // Info button - always fully visible, popover attached here for correct arrow
+            if viewModel != nil || onInfoTapped != nil {
+                Button {
+                    if viewModel != nil {
+                        infoPopoverVariable = variable
+                    } else {
+                        onInfoTapped?(variable)
+                    }
+                } label: {
+                    Image(systemName: "info.circle")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .popover(isPresented: Binding(
+                    get: { infoPopoverVariable == variable },
+                    set: { if !$0 { infoPopoverVariable = nil } }
+                )) {
+                    if let vm = viewModel {
+                        VariableInfoPopover(
+                            variable: variable,
+                            viewModel: vm,
+                            showPositionalToggle: showPositionalToggle
+                        )
+                    }
                 }
             }
 
@@ -142,7 +185,6 @@ struct VariableSidebarView<TrailingContent: View>: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
         .contentShape(Rectangle())
-        .opacity(disabled ? 0.5 : 1.0)
         .onTapGesture {
             guard !disabled else { return }
             singleSelection = variable
@@ -158,26 +200,57 @@ struct VariableSidebarView<TrailingContent: View>: View {
         return VStack(alignment: .leading, spacing: 0) {
             // Main variable row
             HStack {
-                let isAnySelected = isVariableOrComponentSelected(variable)
-                Image(systemName: isAnySelected ? "checkmark.square.fill" : "square")
-                    .foregroundStyle(disabled ? Color.gray.opacity(0.3) : (isAnySelected ? Color.blue : Color.secondary))
-                    .font(.system(size: 12))
+                HStack {
+                    let isAnySelected = isVariableOrComponentSelected(variable)
+                    Image(systemName: isAnySelected ? "checkmark.square.fill" : "square")
+                        .foregroundStyle(disabled ? Color.gray.opacity(0.3) : (isAnySelected ? Color.blue : Color.secondary))
+                        .font(.system(size: 12))
 
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(variable.name)
-                        .font(.system(size: 13))
-                        .foregroundStyle(disabled ? .secondary : .primary)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(variable.name)
+                            .font(.system(size: 13))
+                            .foregroundStyle(disabled ? .secondary : .primary)
 
-                    if showDataTypeInfo {
-                        // Show vector size when not expanding (e.g., "DOUBLE[3]")
-                        if variable.isVector && !expandVectors {
-                            Text("\(variable.dataType.displayName)[\(variable.displayColumnsPerRow)]")
-                                .font(.system(size: 10))
-                                .foregroundStyle(.tertiary)
+                        if showDataTypeInfo {
+                            // Show vector size when not expanding (e.g., "DOUBLE[3]")
+                            if variable.isVector && !expandVectors {
+                                Text("\(variable.dataType.displayName)[\(variable.displayColumnsPerRow)]")
+                                    .font(.system(size: 10))
+                                    .foregroundStyle(.tertiary)
+                            } else {
+                                Text("\(variable.dataType.displayName) [\(variable.recordCount)]")
+                                    .font(.system(size: 10))
+                                    .foregroundStyle(.tertiary)
+                            }
+                        }
+                    }
+                }
+                .opacity(disabled ? 0.5 : 1.0)
+
+                // Info button - always fully visible, popover attached here for correct arrow
+                if viewModel != nil || onInfoTapped != nil {
+                    Button {
+                        if viewModel != nil {
+                            infoPopoverVariable = variable
                         } else {
-                            Text("\(variable.dataType.displayName) [\(variable.recordCount)]")
-                                .font(.system(size: 10))
-                                .foregroundStyle(.tertiary)
+                            onInfoTapped?(variable)
+                        }
+                    } label: {
+                        Image(systemName: "info.circle")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .popover(isPresented: Binding(
+                        get: { infoPopoverVariable == variable },
+                        set: { if !$0 { infoPopoverVariable = nil } }
+                    )) {
+                        if let vm = viewModel {
+                            VariableInfoPopover(
+                                variable: variable,
+                                viewModel: vm,
+                                showPositionalToggle: showPositionalToggle
+                            )
                         }
                     }
                 }
@@ -201,7 +274,6 @@ struct VariableSidebarView<TrailingContent: View>: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 6)
             .contentShape(Rectangle())
-            .opacity(disabled ? 0.5 : 1.0)
             .onTapGesture {
                 guard !disabled else { return }
                 toggleVariable(variable, expanded: shouldExpand)
@@ -338,7 +410,10 @@ extension VariableSidebarView where TrailingContent == EmptyView {
         variables: [CDFVariable],
         selection: Binding<CDFVariable?>,
         showDataTypeInfo: Bool = true,
-        isDisabled: ((CDFVariable) -> Bool)? = nil
+        isDisabled: ((CDFVariable) -> Bool)? = nil,
+        viewModel: CDFViewModel? = nil,
+        showPositionalToggle: Bool = false,
+        onInfoTapped: ((CDFVariable) -> Void)? = nil
     ) {
         self._singleSelection = selection
         self._multiSelection = .constant([])
@@ -348,6 +423,9 @@ extension VariableSidebarView where TrailingContent == EmptyView {
         self.showDataTypeInfo = showDataTypeInfo
         self.expandVectors = true
         self.isDisabled = isDisabled
+        self.viewModel = viewModel
+        self.showPositionalToggle = showPositionalToggle
+        self.onInfoTapped = onInfoTapped
         self.singleSelectionTrailing = { _ in EmptyView() }
     }
 
@@ -360,7 +438,10 @@ extension VariableSidebarView where TrailingContent == EmptyView {
         expandVectors: Bool = true,
         isDisabled: ((CDFVariable) -> Bool)? = nil,
         colorForKey: ((String) -> Color?)? = nil,
-        valueForKey: ((String) -> Double?)? = nil
+        valueForKey: ((String) -> Double?)? = nil,
+        viewModel: CDFViewModel? = nil,
+        showPositionalToggle: Bool = false,
+        onInfoTapped: ((CDFVariable) -> Void)? = nil
     ) {
         self._singleSelection = singleSelection
         self._multiSelection = multiSelection
@@ -370,6 +451,9 @@ extension VariableSidebarView where TrailingContent == EmptyView {
         self.isDisabled = isDisabled
         self.colorForKey = colorForKey
         self.valueForKey = valueForKey
+        self.viewModel = viewModel
+        self.showPositionalToggle = showPositionalToggle
+        self.onInfoTapped = onInfoTapped
         self.singleSelectionTrailing = { _ in EmptyView() }
     }
 }
@@ -385,6 +469,9 @@ extension VariableSidebarView {
         isDisabled: ((CDFVariable) -> Bool)? = nil,
         colorForKey: ((String) -> Color?)? = nil,
         valueForKey: ((String) -> Double?)? = nil,
+        viewModel: CDFViewModel? = nil,
+        showPositionalToggle: Bool = false,
+        onInfoTapped: ((CDFVariable) -> Void)? = nil,
         @ViewBuilder singleSelectionTrailing: @escaping (CDFVariable) -> TrailingContent
     ) {
         self._singleSelection = singleSelection
@@ -395,6 +482,9 @@ extension VariableSidebarView {
         self.isDisabled = isDisabled
         self.colorForKey = colorForKey
         self.valueForKey = valueForKey
+        self.viewModel = viewModel
+        self.showPositionalToggle = showPositionalToggle
+        self.onInfoTapped = onInfoTapped
         self.singleSelectionTrailing = singleSelectionTrailing
     }
 }

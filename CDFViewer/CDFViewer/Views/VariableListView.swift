@@ -25,7 +25,9 @@ struct VariableListView: View {
                 singleSelection: $viewModel.tableTimeVariable,
                 multiSelection: $viewModel.tableSelectedComponents,
                 sections: sidebarSections,
-                showDataTypeInfo: true
+                showDataTypeInfo: true,
+                viewModel: viewModel,
+                showPositionalToggle: false
             )
         } else {
             ContentUnavailableView(

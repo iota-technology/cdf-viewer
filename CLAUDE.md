@@ -117,10 +117,17 @@ Chart {
 }
 ```
 
-**Xcode project file structure**: When adding new Swift files to an Xcode project, you need to add entries in THREE places in `project.pbxproj`:
+**Xcode project file structure**: When adding new Swift files to an Xcode project, you need to add entries in FOUR places in `project.pbxproj`:
 1. `PBXBuildFile` section - references the file for compilation
 2. `PBXFileReference` section - defines the file itself
 3. `PBXGroup` section - adds file to the appropriate folder/group in the navigator
+4. `PBXSourcesBuildPhase` section - adds file to the Sources build phase
+
+**FileDocument doesn't expose original file URL**: SwiftUI's `FileDocument` protocol sandboxes files and copies them to a temp directory. If you need the original file URL (e.g., for storing metadata via xattr), you must use AppKit's `NSDocument` instead. Create an `NSDocument` subclass and bridge it to SwiftUI via `NSHostingController`.
+
+**NSDocument print() shadows Swift.print()**: Inside an `NSDocument` subclass, `print()` refers to the document's print method, not Swift's console output. Use `Swift.print()` explicitly for debug logging.
+
+**@Observable vs ObservableObject**: When using Swift Observation's `@Observable` macro (not Combine's `ObservableObject`), don't use `@ObservedObject` - just pass the object as a regular property or use `@Bindable` for two-way binding
 
 **macOS Tahoe Liquid Glass toolbar**: In NavigationSplitView, the toolbar glass effect stops at the sidebar edge by default, creating an ugly visual break. Fix by hiding the toolbar background on the detail view, which allows Liquid Glass to flow continuously:
 

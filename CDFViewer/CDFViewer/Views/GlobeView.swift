@@ -32,9 +32,10 @@ struct GlobeView: View {
     private let earthRadiusKm: Double = 6371.0
     private let metersToSceneUnits: Double = 1.0 / 1_000_000.0  // 1 scene unit = 1000 km
 
-    /// Set of ECEF variable names for fast lookup
-    private var ecefVariableNames: Set<String> {
-        Set(viewModel.cdfFile?.ecefPositionVariables().map { $0.name } ?? [])
+    /// Set of positional variable names for fast lookup (respects user overrides)
+    private var positionalVariableNames: Set<String> {
+        guard let file = viewModel.cdfFile else { return [] }
+        return Set(file.numericVariables().filter { viewModel.isPositional($0) }.map { $0.name })
     }
 
     /// Current timestamp based on cursor progress
@@ -111,10 +112,12 @@ struct GlobeView: View {
             isDisabled: { variable in
                 // Disable non-ECEF variables in the Position section
                 // (Time variables are never disabled)
-                !ecefVariableNames.contains(variable.name) &&
+                !viewModel.isPositional(variable) &&
                 !(viewModel.cdfFile?.timestampVariables().contains(where: { $0.name == variable.name }) ?? false)
             },
             colorForKey: trackColor,
+            viewModel: viewModel,
+            showPositionalToggle: true,
             singleSelectionTrailing: { variable in
                 // Show timestamp for selected time variable
                 if selectedTimeVariable == variable, let date = currentTimestamp {
@@ -513,9 +516,9 @@ struct GlobeView: View {
     private func loadPositions() {
         guard let file = viewModel.cdfFile else { return }
 
-        // Filter to only ECEF variables that are selected
-        let selectedEcefVars = selectedPositionVariables.filter { ecefVariableNames.contains($0) }
-        guard !selectedEcefVars.isEmpty else {
+        // Filter to only positional variables that are selected
+        let selectedPosVars = selectedPositionVariables.filter { positionalVariableNames.contains($0) }
+        guard !selectedPosVars.isEmpty else {
             // Clear all tracks and remove from scene
             tracks = [:]
             timestamps = []
@@ -533,7 +536,7 @@ struct GlobeView: View {
                 // Load positions for each selected variable
                 var newTracks: [String: [(x: Double, y: Double, z: Double)]] = [:]
 
-                for varName in selectedEcefVars {
+                for varName in selectedPosVars {
                     guard let posVar = file.variables.first(where: { $0.name == varName }) else { continue }
                     let positions = try file.readECEFPositions(for: posVar)
                     newTracks[varName] = positions

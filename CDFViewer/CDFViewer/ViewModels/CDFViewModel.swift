@@ -7,6 +7,12 @@ final class CDFViewModel {
     // The loaded CDF file
     var cdfFile: CDFFile?
 
+    /// Original file URL for xattr persistence (set from NSDocument)
+    var originalFileURL: URL?
+
+    /// User overrides for variable metadata (colors, positional flag)
+    var variableOverrides: [String: VariableMetadata] = [:]
+
     // Table selection state (new multi-column approach)
     var tableTimeVariable: CDFVariable? {
         didSet { loadTableData() }
@@ -355,6 +361,77 @@ final class CDFViewModel {
             return String(format: "%.6e", value)
         } else {
             return String(format: "%.6f", value)
+        }
+    }
+
+    // MARK: - Variable Metadata
+
+    /// Check if a variable should be treated as positional (for Globe)
+    /// Returns the override if set, otherwise falls back to heuristic
+    func isPositional(_ variable: CDFVariable) -> Bool {
+        if let override = variableOverrides[variable.name]?.isPositional {
+            return override
+        }
+        return variable.isECEFPosition
+    }
+
+    /// Get color for a variable, respecting user override
+    func colorFor(_ variableName: String, index: Int, palette: [Color]) -> Color {
+        if let hex = variableOverrides[variableName]?.customColor,
+           let color = Color(hex: hex) {
+            return color
+        }
+        return palette[index % palette.count]
+    }
+
+    /// Get metadata for a variable (creates default if not exists)
+    func metadata(for variableName: String) -> VariableMetadata {
+        variableOverrides[variableName] ?? VariableMetadata()
+    }
+
+    /// Update metadata for a variable and save to xattr
+    func setMetadata(_ metadata: VariableMetadata, for variableName: String) {
+        if metadata.hasOverrides {
+            variableOverrides[variableName] = metadata
+        } else {
+            variableOverrides.removeValue(forKey: variableName)
+        }
+        saveMetadata()
+    }
+
+    /// Load metadata from extended attributes on the original file
+    func loadMetadata() {
+        guard let url = originalFileURL else { return }
+
+        guard let data = url.extendedAttribute(forName: URL.cdfViewerMetadataAttributeName) else {
+            return
+        }
+
+        do {
+            let fileMetadata = try JSONDecoder().decode(FileMetadata.self, from: data)
+            variableOverrides = fileMetadata.variableOverrides
+        } catch {
+            print("Failed to load metadata: \(error)")
+        }
+    }
+
+    /// Save metadata to extended attributes on the original file
+    func saveMetadata() {
+        guard let url = originalFileURL else { return }
+
+        let fileMetadata = FileMetadata(variableOverrides: variableOverrides)
+
+        // If no overrides, remove the attribute
+        if fileMetadata.isEmpty {
+            try? url.removeExtendedAttribute(forName: URL.cdfViewerMetadataAttributeName)
+            return
+        }
+
+        do {
+            let data = try JSONEncoder().encode(fileMetadata)
+            try url.setExtendedAttribute(data, forName: URL.cdfViewerMetadataAttributeName)
+        } catch {
+            print("Failed to save metadata: \(error)")
         }
     }
 }

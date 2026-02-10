@@ -48,6 +48,8 @@ struct TimeSeriesChartView: View {
             showDataTypeInfo: true,
             colorForKey: seriesColor,
             valueForKey: getCurrentValue,
+            viewModel: viewModel,
+            showPositionalToggle: false,
             singleSelectionTrailing: { variable in
                 // Show timestamp for selected time variable when hovering
                 if selectedTimeVariable == variable, let date = activeDate {
