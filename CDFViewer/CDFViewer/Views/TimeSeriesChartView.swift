@@ -368,11 +368,11 @@ struct TimeSeriesChartView: View {
             let firstComponentIndex = chartSeries.firstIndex(where: { $0.name.hasPrefix(varName + ".") }) ?? index
             let baseColor = viewModel.colorFor(varName, index: firstComponentIndex, palette: chartColorPalette)
 
-            // Apply hue shift based on component
+            // X uses base color as-is; Y/Z shift hue by 30°/60° in LCH (preserving L and C)
             switch component {
             case "X": return baseColor
-            case "Y": return baseColor.hueShifted(by: 30)
-            case "Z": return baseColor.hueShifted(by: 60)
+            case "Y": return baseColor.lchHueShifted(by: 30)
+            case "Z": return baseColor.lchHueShifted(by: 60)
             default: return baseColor
             }
         } else {

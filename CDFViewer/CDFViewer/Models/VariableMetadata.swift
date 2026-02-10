@@ -62,7 +62,118 @@ extension Color {
         return String(format: "#%02X%02X%02X", r, g, b)
     }
 
-    /// Shift the hue by a given number of degrees
+    /// Extract LCH (Lightness, Chroma, Hue) values from this color
+    var lchComponents: (l: Double, c: Double, h: Double) {
+        guard let nsColor = NSColor(self).usingColorSpace(.deviceRGB) else {
+            return (50, 0, 0)
+        }
+
+        // Get RGB components
+        var r = Double(nsColor.redComponent)
+        var g = Double(nsColor.greenComponent)
+        var b = Double(nsColor.blueComponent)
+
+        // sRGB to linear RGB (inverse gamma)
+        func linearize(_ c: Double) -> Double {
+            c <= 0.04045 ? c / 12.92 : pow((c + 0.055) / 1.055, 2.4)
+        }
+        r = linearize(r)
+        g = linearize(g)
+        b = linearize(b)
+
+        // Linear RGB to XYZ (D65)
+        let x = 0.4124564 * r + 0.3575761 * g + 0.1804375 * b
+        let y = 0.2126729 * r + 0.7151522 * g + 0.0721750 * b
+        let z = 0.0193339 * r + 0.1191920 * g + 0.9503041 * b
+
+        // XYZ to LAB (D65 white point)
+        let xn = 0.95047
+        let yn = 1.0
+        let zn = 1.08883
+
+        func f(_ t: Double) -> Double {
+            let delta = 6.0 / 29.0
+            return t > delta * delta * delta ? pow(t, 1.0 / 3.0) : t / (3.0 * delta * delta) + 4.0 / 29.0
+        }
+
+        let fx = f(x / xn)
+        let fy = f(y / yn)
+        let fz = f(z / zn)
+
+        let l = 116.0 * fy - 16.0
+        let a = 500.0 * (fx - fy)
+        let labB = 200.0 * (fy - fz)
+
+        // LAB to LCH
+        let c = sqrt(a * a + labB * labB)
+        var h = atan2(labB, a) * 180.0 / .pi
+        if h < 0 { h += 360.0 }
+
+        return (l, c, h)
+    }
+
+    /// Create a color in LCH color space (perceptually uniform)
+    /// - Parameters:
+    ///   - lightness: L value (0-100)
+    ///   - chroma: C value (0-~130 typical max)
+    ///   - hue: H value in degrees (0-360)
+    static func lch(lightness: Double, chroma: Double, hue: Double) -> Color {
+        // LCH to LAB
+        let hueRad = hue * .pi / 180.0
+        let a = chroma * cos(hueRad)
+        let b = chroma * sin(hueRad)
+
+        // LAB to XYZ (D65 white point)
+        let fy = (lightness + 16.0) / 116.0
+        let fx = a / 500.0 + fy
+        let fz = fy - b / 200.0
+
+        let epsilon = 216.0 / 24389.0
+        let kappa = 24389.0 / 27.0
+
+        let xr = fx * fx * fx > epsilon ? fx * fx * fx : (116.0 * fx - 16.0) / kappa
+        let yr = lightness > kappa * epsilon ? pow((lightness + 16.0) / 116.0, 3) : lightness / kappa
+        let zr = fz * fz * fz > epsilon ? fz * fz * fz : (116.0 * fz - 16.0) / kappa
+
+        // D65 white point
+        let x = xr * 0.95047
+        let y = yr * 1.0
+        let z = zr * 1.08883
+
+        // XYZ to linear sRGB
+        var r = 3.2404542 * x - 1.5371385 * y - 0.4985314 * z
+        var g = -0.9692660 * x + 1.8760108 * y + 0.0415560 * z
+        var bl = 0.0556434 * x - 0.2040259 * y + 1.0572252 * z
+
+        // Apply sRGB gamma correction
+        func gammaCorrect(_ c: Double) -> Double {
+            c <= 0.0031308 ? 12.92 * c : 1.055 * pow(c, 1.0 / 2.4) - 0.055
+        }
+
+        r = gammaCorrect(r)
+        g = gammaCorrect(g)
+        bl = gammaCorrect(bl)
+
+        // Clamp to valid range
+        r = max(0, min(1, r))
+        g = max(0, min(1, g))
+        bl = max(0, min(1, bl))
+
+        return Color(red: r, green: g, blue: bl)
+    }
+
+    /// Create an LCH color variant preserving this color's L and C, but shifting H
+    /// This keeps Y and Z "in theme" with X by matching lightness and chroma
+    func lchHueShifted(by degrees: Double) -> Color {
+        let (l, c, h) = self.lchComponents
+        var newHue = h + degrees
+        // Wrap hue to 0-360
+        while newHue < 0 { newHue += 360 }
+        while newHue >= 360 { newHue -= 360 }
+        return Color.lch(lightness: l, chroma: c, hue: newHue)
+    }
+
+    /// Shift the hue by a given number of degrees (HSB-based, for backwards compatibility)
     func hueShifted(by degrees: Double) -> Color {
         guard let nsColor = NSColor(self).usingColorSpace(.deviceRGB) else {
             return self
@@ -88,12 +199,12 @@ extension Color {
 
 extension VariableMetadata {
     /// Get colors for vector components (X, Y, Z) based on base color
-    /// X uses the base color, Y shifts by 30°, Z shifts by 60°
+    /// X uses the base color as-is; Y and Z preserve L/C but shift hue by 30°/60°
     static func componentColors(for baseColor: Color) -> (x: Color, y: Color, z: Color) {
         return (
             x: baseColor,
-            y: baseColor.hueShifted(by: 30),
-            z: baseColor.hueShifted(by: 60)
+            y: baseColor.lchHueShifted(by: 30),
+            z: baseColor.lchHueShifted(by: 60)
         )
     }
 }

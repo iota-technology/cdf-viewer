@@ -5,6 +5,15 @@ All notable changes to CDF Viewer will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.4] - 2025-02-10
+
+### Added
+
+- Variable info popover with color picker (click ℹ️ button next to any variable)
+- Custom color persistence via macOS extended attributes (colors saved on CDF file)
+- LCH color space for vector component colors (X/Y/Z shift hue by 30°/60° while preserving lightness and chroma)
+- Positional toggle in globe view info popover to override ECEF detection heuristic
+
 ## [0.4.3] - 2025-02-10
 
 ### Fixed

@@ -103,8 +103,8 @@ struct VariableInfoPopover: View {
                 if variable.isVector {
                     VStack(alignment: .leading, spacing: 2) {
                         animatedColorRow("X", color: selectedColor, index: 0)
-                        animatedColorRow("Y", color: selectedColor.hueShifted(by: 30), index: 1)
-                        animatedColorRow("Z", color: selectedColor.hueShifted(by: 60), index: 2)
+                        animatedColorRow("Y", color: selectedColor.lchHueShifted(by: 30), index: 1)
+                        animatedColorRow("Z", color: selectedColor.lchHueShifted(by: 60), index: 2)
                     }
                     .clipped()
                     .padding(.top, 28)  // Position below the color picker
