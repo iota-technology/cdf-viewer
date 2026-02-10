@@ -15,10 +15,7 @@ final class CDFFile: Identifiable {
     private(set) var warnings: [CDFWarning] = []
     private(set) var parseError: CDFError?
 
-    // Selection state
-    var selectedVariable: CDFVariable?
-
-    // Cached data for selected variable
+    // Cached data
     private var cachedVariableData: [String: [CDFValue]] = [:]
 
     init(url: URL, displayName: String? = nil) throws {

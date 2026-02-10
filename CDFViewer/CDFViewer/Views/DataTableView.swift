@@ -2,187 +2,150 @@ import SwiftUI
 
 struct DataTableView: View {
     @Bindable var viewModel: CDFViewModel
-    let variable: CDFVariable
 
     @State private var selectedRows: Set<Int> = []
-    @State private var showVectorInspector = false
-    @State private var inspectedRow: CDFDataRow?
 
-    private var columns: [CDFColumn] {
-        CDFColumn.columnsForVariable(variable)
-    }
+    // Column widths
+    private let timeColumnWidth: CGFloat = 180
+    private let dataColumnWidth: CGFloat = 140
 
     var body: some View {
         VStack(spacing: 0) {
-            // Header with variable info
-            VariableHeaderView(variable: variable) { dependName in
-                // Navigate to the dependent variable
-                if let file = viewModel.cdfFile,
-                   let dependVar = file.variables.first(where: { $0.name == dependName }) {
-                    viewModel.selectedVariable = dependVar
-                }
-            }
-
-            Divider()
-
-            // Data table
             if viewModel.isLoadingData {
                 ProgressView("Loading data...")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if let error = viewModel.dataError {
                 ErrorBanner(error: error)
+            } else if viewModel.tableColumns.isEmpty {
+                ContentUnavailableView(
+                    "No Data Selected",
+                    systemImage: "tablecells",
+                    description: Text("Select a time variable and data variables from the sidebar")
+                )
             } else {
                 // Column headers
-                HStack(spacing: 0) {
-                    Text(variable.isSingleRecordArray ? "Index" : "Record")
-                        .font(.caption.weight(.semibold))
-                        .frame(width: 70, alignment: .leading)
-                        .padding(.horizontal, 8)
-
-                    ForEach(columns) { column in
-                        Text(column.name)
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 0) {
+                        // Time column header
+                        Text("Time")
                             .font(.caption.weight(.semibold))
-                            .frame(width: column.width, alignment: .leading)
-                            .padding(.horizontal, 4)
-                    }
+                            .frame(width: timeColumnWidth, alignment: .leading)
+                            .padding(.horizontal, 8)
 
-                    Spacer()
+                        // Data column headers
+                        ForEach(viewModel.tableColumns.filter { $0.key != "time" }) { column in
+                            Text(column.name)
+                                .font(.caption.weight(.semibold))
+                                .frame(width: dataColumnWidth, alignment: .trailing)
+                                .padding(.horizontal, 4)
+                        }
+                    }
+                    .padding(.vertical, 6)
+                    .background(.bar)
                 }
-                .padding(.vertical, 6)
-                .background(.bar)
 
                 Divider()
 
                 // Data rows
-                List(viewModel.currentData, selection: $selectedRows) { row in
-                    HStack(spacing: 0) {
-                        Text("\(row.id)")
-                            .font(.system(.body, design: .monospaced))
-                            .foregroundStyle(.secondary)
-                            .frame(width: 70, alignment: .leading)
+                ScrollView(.horizontal, showsIndicators: true) {
+                    List(viewModel.tableRows, selection: $selectedRows) { row in
+                        HStack(spacing: 0) {
+                            // Time value
+                            Text(row.timestamp, format: .dateTime.year().month().day().hour().minute().second())
+                                .font(.system(.body, design: .monospaced))
+                                .frame(width: timeColumnWidth, alignment: .leading)
+                                .padding(.horizontal, 8)
 
-                        ForEach(Array(columns.enumerated()), id: \.offset) { index, column in
-                            if index < row.values.count {
-                                Text(row.values[index].stringValue)
-                                    .font(.system(.body, design: .monospaced))
-                                    .frame(width: column.width, alignment: .leading)
-                                    .lineLimit(1)
-                            } else {
-                                Text("-")
-                                    .frame(width: column.width, alignment: .leading)
-                                    .foregroundStyle(.tertiary)
+                            // Data values
+                            ForEach(viewModel.tableColumns.filter { $0.key != "time" }) { column in
+                                if let value = row.values[column.key] {
+                                    Text(formatValue(value))
+                                        .font(.system(.body, design: .monospaced))
+                                        .frame(width: dataColumnWidth, alignment: .trailing)
+                                        .padding(.horizontal, 4)
+                                } else {
+                                    Text("-")
+                                        .font(.system(.body, design: .monospaced))
+                                        .frame(width: dataColumnWidth, alignment: .trailing)
+                                        .foregroundStyle(.tertiary)
+                                        .padding(.horizontal, 4)
+                                }
                             }
                         }
-
-                        Spacer()
-                    }
-                    .tag(row.id)
-                    .contextMenu {
-                        Button("Inspect Row") {
-                            inspectedRow = row
-                            showVectorInspector = true
-                        }
-                        Button("Copy Row") {
-                            copyRow(row)
+                        .tag(row.id)
+                        .contextMenu {
+                            Button("Copy Row") {
+                                copyRows([row.id])
+                            }
                         }
                     }
+                    .listStyle(.plain)
                 }
-                .listStyle(.plain)
-            }
 
-            // Footer with stats
-            TableFooterView(
-                totalRecords: variable.displayRowCount,
-                displayedRecords: viewModel.currentData.count,
-                selectedCount: selectedRows.count
-            )
-        }
-        .sheet(isPresented: $showVectorInspector) {
-            if let row = inspectedRow {
-                VectorInspectorView(
-                    row: row,
-                    variable: variable,
-                    columns: columns
+                // Footer with stats
+                TableFooterView(
+                    totalRecords: viewModel.totalRecords,
+                    displayedRecords: viewModel.tableRows.count,
+                    selectedCount: selectedRows.count
                 )
             }
         }
-    }
-
-    private func copyRow(_ row: CDFDataRow) {
-        let values = (["\(row.id)"] + row.values.map { $0.stringValue }).joined(separator: "\t")
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(values, forType: .string)
-    }
-}
-
-// MARK: - Variable Header
-
-struct VariableHeaderView: View {
-    let variable: CDFVariable
-    var onDependsOnTapped: ((String) -> Void)?
-
-    var body: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(variable.name)
-                    .font(.headline)
-
-                HStack(spacing: 12) {
-                    Label(variable.dataType.displayName, systemImage: "number")
-                    Label(variable.dimensionString, systemImage: "square.grid.2x2")
-                    Label("\(variable.displayRowCount) rows", systemImage: "list.bullet")
-                }
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            }
-
-            Spacer()
-
-            // Show DEPEND attribute if present - clickable to navigate
-            if let depend = variable.dependsOn {
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
                 Button {
-                    onDependsOnTapped?(depend)
+                    exportCSV()
                 } label: {
-                    HStack(spacing: 4) {
-                        Text("Depends on:")
-                            .foregroundStyle(.secondary)
-                        Text(depend)
-                            .foregroundStyle(.blue)
-                    }
-                    .font(.caption)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(.fill.quaternary)
-                    .clipShape(Capsule())
+                    Label("Export CSV", systemImage: "square.and.arrow.up")
                 }
-                .buttonStyle(.plain)
-                .help("Click to navigate to \(depend)")
+                .disabled(viewModel.tableRows.isEmpty)
             }
         }
-        .padding(.horizontal)
-        .padding(.vertical, 8)
-        .background(.background)
-    }
-}
-
-// MARK: - Data Cell
-
-struct DataCellView: View {
-    let value: CDFValue
-    let dataType: CDFDataType
-
-    var body: some View {
-        Text(value.stringValue)
-            .font(.system(.body, design: .monospaced))
-            .lineLimit(1)
-            .foregroundStyle(textColor)
     }
 
-    private var textColor: Color {
-        if dataType.isTimeType {
-            return .blue
+    private func formatValue(_ value: Double) -> String {
+        if abs(value) >= 1e6 || (abs(value) < 1e-3 && value != 0) {
+            return String(format: "%.6e", value)
+        } else {
+            return String(format: "%.6f", value)
         }
-        return .primary
+    }
+
+    private func copyRows(_ selection: Set<Int>) {
+        let selectedRowData = viewModel.tableRows.filter { selection.contains($0.id) }
+        var text = viewModel.tableColumns.map { $0.name }.joined(separator: "\t") + "\n"
+
+        for row in selectedRowData {
+            var values: [String] = []
+            for column in viewModel.tableColumns {
+                if column.key == "time" {
+                    values.append(row.timestamp.ISO8601Format())
+                } else if let value = row.values[column.key] {
+                    values.append(formatValue(value))
+                } else {
+                    values.append("")
+                }
+            }
+            text += values.joined(separator: "\t") + "\n"
+        }
+
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
+    }
+
+    private func exportCSV() {
+        do {
+            let csv = try viewModel.exportTableAsCSV()
+
+            let savePanel = NSSavePanel()
+            savePanel.allowedContentTypes = [.commaSeparatedText]
+            savePanel.nameFieldStringValue = "export.csv"
+
+            if savePanel.runModal() == .OK, let url = savePanel.url {
+                try csv.write(to: url, atomically: true, encoding: .utf8)
+            }
+        } catch {
+            print("Export failed: \(error)")
+        }
     }
 }
 
@@ -198,6 +161,12 @@ struct TableFooterView: View {
             Text("\(displayedRecords) of \(totalRecords) rows")
                 .font(.caption)
                 .foregroundStyle(.secondary)
+
+            if displayedRecords < totalRecords {
+                Text("(showing first \(displayedRecords))")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+            }
 
             Spacer()
 
@@ -235,19 +204,5 @@ struct ErrorBanner: View {
 }
 
 #Preview {
-    DataTableView(
-        viewModel: CDFViewModel(),
-        variable: CDFVariable(
-            name: "r_ecef",
-            dataType: .double,
-            numElements: 1,
-            dimensions: [86400, 3],
-            dimVarys: [true, true],
-            maxRecord: 0,
-            isZVariable: true,
-            vxrOffset: 0,
-            cprOffset: 0,
-            attributes: [:]
-        )
-    )
+    DataTableView(viewModel: CDFViewModel())
 }

@@ -7,19 +7,17 @@ final class CDFViewModel {
     // The loaded CDF file
     var cdfFile: CDFFile?
 
-    // Selection state
-    var selectedVariable: CDFVariable? {
-        didSet {
-            if let variable = selectedVariable {
-                loadVariableData(variable)
-            } else {
-                currentData = []
-            }
-        }
+    // Table selection state (new multi-column approach)
+    var tableTimeVariable: CDFVariable? {
+        didSet { loadTableData() }
+    }
+    var tableSelectedComponents: Set<String> = [] {  // "varName" or "varName.X"
+        didSet { loadTableData() }
     }
 
-    // Data for current selection
-    private(set) var currentData: [CDFDataRow] = []
+    // Table data
+    private(set) var tableColumns: [DataColumn] = []
+    private(set) var tableRows: [DataRow] = []
     private(set) var isLoadingData = false
     private(set) var dataError: CDFError?
 
@@ -32,18 +30,9 @@ final class CDFViewModel {
     var globePositionVariable: CDFVariable?
     var showGlobe = false
 
-    // Visible row range for lazy loading
-    var visibleRange: Range<Int> = 0..<100 {
-        didSet {
-            if let variable = selectedVariable {
-                loadVisibleData(variable)
-            }
-        }
-    }
-
-    // Total rows for current variable (uses displayRowCount for proper row handling)
+    // Total rows for table
     var totalRecords: Int {
-        selectedVariable?.displayRowCount ?? 0
+        tableTimeVariable?.recordCount ?? 0
     }
 
     // MARK: - File Loading
@@ -51,12 +40,7 @@ final class CDFViewModel {
     func loadFile(from url: URL) {
         do {
             cdfFile = try CDFFile(url: url)
-            // Auto-select first variable
-            if let first = cdfFile?.variables.first {
-                selectedVariable = first
-            }
-            // Auto-detect chart time variable
-            chartTimeVariable = cdfFile?.timestampVariables().first
+            setupDefaults()
         } catch let error as CDFError {
             dataError = error
         } catch {
@@ -64,46 +48,151 @@ final class CDFViewModel {
         }
     }
 
-    // MARK: - Data Loading
-
-    private func loadVariableData(_ variable: CDFVariable) {
+    /// Set up default selections for a loaded file
+    func setupDefaults() {
         guard let file = cdfFile else { return }
+
+        // Auto-detect time variable for table and chart
+        if let timeVar = file.timestampVariables().first {
+            tableTimeVariable = timeVar
+            chartTimeVariable = timeVar
+        }
+        // Auto-select first ECEF position variable's components
+        if let ecefVar = file.ecefPositionVariables().first {
+            let components = componentNames(for: ecefVar)
+            for comp in components {
+                tableSelectedComponents.insert("\(ecefVar.name).\(comp)")
+            }
+        }
+    }
+
+    // MARK: - Table Data Loading
+
+    private func loadTableData() {
+        guard let file = cdfFile,
+              let timeVar = tableTimeVariable,
+              !tableSelectedComponents.isEmpty else {
+            tableColumns = []
+            tableRows = []
+            return
+        }
 
         isLoadingData = true
         dataError = nil
 
         Task { @MainActor in
             do {
-                // Load initial visible range (use displayRowCount for proper row counting)
-                let range = 0..<min(1000, variable.displayRowCount)
-                currentData = try file.readDataRows(for: variable, range: range)
+                // Read timestamps
+                let timestamps = try file.readTimestamps(for: timeVar)
+
+                // Build columns list
+                var columns: [DataColumn] = [
+                    DataColumn(id: "time", name: "Time", key: "time")
+                ]
+
+                // Group selected components by variable
+                var variableComponents: [String: [String]] = [:]  // varName -> [X, Y, Z]
+                var scalarVariables: [String] = []
+
+                for key in tableSelectedComponents {
+                    if key.contains(".") {
+                        let parts = key.split(separator: ".")
+                        let varName = String(parts[0])
+                        let component = String(parts[1])
+                        variableComponents[varName, default: []].append(component)
+                    } else {
+                        scalarVariables.append(key)
+                    }
+                }
+
+                // Add columns for vector components
+                for (varName, components) in variableComponents.sorted(by: { $0.key < $1.key }) {
+                    for component in components.sorted() {
+                        let key = "\(varName).\(component)"
+                        columns.append(DataColumn(id: key, name: "\(varName).\(component)", key: key))
+                    }
+                }
+
+                // Add columns for scalar variables
+                for varName in scalarVariables.sorted() {
+                    columns.append(DataColumn(id: varName, name: varName, key: varName))
+                }
+
+                // Read data for each variable/component
+                var columnData: [String: [Double]] = [:]
+
+                // Load vector component data
+                for (varName, components) in variableComponents {
+                    guard let variable = file.variables.first(where: { $0.name == varName }) else { continue }
+                    let values = try file.readDoubles(for: variable)
+                    let elementsPerRecord = variable.totalElements
+                    let componentNames = self.componentNames(for: variable)
+
+                    for component in components {
+                        guard let compIndex = componentNames.firstIndex(of: component) else { continue }
+                        let key = "\(varName).\(component)"
+
+                        var componentValues: [Double] = []
+                        for i in 0..<timestamps.count {
+                            let valueIndex = i * elementsPerRecord + compIndex
+                            if valueIndex < values.count {
+                                componentValues.append(values[valueIndex])
+                            }
+                        }
+                        columnData[key] = componentValues
+                    }
+                }
+
+                // Load scalar data
+                for varName in scalarVariables {
+                    guard let variable = file.variables.first(where: { $0.name == varName }) else { continue }
+                    let values = try file.readDoubles(for: variable)
+                    columnData[varName] = values
+                }
+
+                // Build rows (limit to first 10000 for performance)
+                let maxRows = min(timestamps.count, 10000)
+                var rows: [DataRow] = []
+
+                for i in 0..<maxRows {
+                    let date = Date(timeIntervalSince1970: timestamps[i])
+                    var values: [String: Double] = [:]
+
+                    for (key, data) in columnData {
+                        if i < data.count {
+                            values[key] = data[i]
+                        }
+                    }
+
+                    rows.append(DataRow(id: i, timestamp: date, values: values))
+                }
+
+                self.tableColumns = columns
+                self.tableRows = rows
                 isLoadingData = false
             } catch let error as CDFError {
                 dataError = error
+                tableColumns = []
+                tableRows = []
                 isLoadingData = false
             } catch {
-                dataError = .dataReadFailed(variable: variable.name, reason: error.localizedDescription)
+                dataError = .corruptedData(error.localizedDescription)
+                tableColumns = []
+                tableRows = []
                 isLoadingData = false
             }
         }
     }
 
-    private func loadVisibleData(_ variable: CDFVariable) {
-        guard let file = cdfFile else { return }
-
-        // Extend range slightly for smooth scrolling
-        let bufferSize = 50
-        let extendedStart = max(0, visibleRange.lowerBound - bufferSize)
-        let extendedEnd = min(variable.displayRowCount, visibleRange.upperBound + bufferSize)
-
-        Task { @MainActor in
-            do {
-                let rows = try file.readDataRows(for: variable, range: extendedStart..<extendedEnd)
-                // Merge with existing data if needed
-                currentData = rows
-            } catch {
-                // Ignore errors for lazy loading - keep existing data
-            }
+    /// Get component names for a vector variable
+    private func componentNames(for variable: CDFVariable) -> [String] {
+        let count = variable.totalElements
+        if count == 3 {
+            return ["X", "Y", "Z"]
+        } else if count == 2 {
+            return ["X", "Y"]
+        } else {
+            return (0..<min(count, 10)).map { "[\($0)]" }
         }
     }
 
@@ -153,21 +242,49 @@ final class CDFViewModel {
 
     // MARK: - Export
 
-    func exportDataAsCSV(variable: CDFVariable) throws -> String {
-        guard let file = cdfFile else {
-            throw CDFError.dataReadFailed(variable: variable.name, reason: "No file loaded")
+    func exportTableAsCSV() throws -> String {
+        guard !tableColumns.isEmpty, !tableRows.isEmpty else {
+            throw CDFError.dataReadFailed(variable: "table", reason: "No data to export")
         }
 
-        let rows = try file.readDataRows(for: variable)
-        let columns = CDFColumn.columnsForVariable(variable)
+        var csv = tableColumns.map { $0.name }.joined(separator: ",") + "\n"
 
-        var csv = "Record," + columns.map { $0.name }.joined(separator: ",") + "\n"
-
-        for row in rows {
-            let values = row.values.map { $0.stringValue }
-            csv += "\(row.id)," + values.joined(separator: ",") + "\n"
+        for row in tableRows {
+            var values: [String] = []
+            for column in tableColumns {
+                if column.key == "time" {
+                    values.append(row.timestamp.ISO8601Format())
+                } else if let value = row.values[column.key] {
+                    values.append(formatValue(value))
+                } else {
+                    values.append("")
+                }
+            }
+            csv += values.joined(separator: ",") + "\n"
         }
 
         return csv
     }
+
+    private func formatValue(_ value: Double) -> String {
+        if abs(value) >= 1e6 || (abs(value) < 1e-3 && value != 0) {
+            return String(format: "%.6e", value)
+        } else {
+            return String(format: "%.6f", value)
+        }
+    }
+}
+
+// MARK: - Table Data Structures
+
+struct DataColumn: Identifiable {
+    let id: String
+    let name: String
+    let key: String
+}
+
+struct DataRow: Identifiable {
+    let id: Int
+    let timestamp: Date
+    let values: [String: Double]
 }

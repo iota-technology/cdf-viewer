@@ -17,25 +17,14 @@ struct ContentView: View {
             // Main content area
             if let error = document.loadError {
                 ErrorView(error: error)
-            } else if let selectedVar = viewModel.selectedVariable {
-                DataTableView(viewModel: viewModel, variable: selectedVar)
             } else {
-                ContentUnavailableView(
-                    "Select a Variable",
-                    systemImage: "sidebar.left",
-                    description: Text("Choose a variable from the sidebar to view its data")
-                )
+                DataTableView(viewModel: viewModel)
             }
         }
         .onAppear {
             if let file = document.cdfFile {
                 viewModel.cdfFile = file
-                // Auto-select first variable
-                if let first = file.variables.first {
-                    viewModel.selectedVariable = first
-                }
-                // Auto-detect time variable
-                viewModel.chartTimeVariable = file.timestampVariables().first
+                viewModel.setupDefaults()
                 // Register viewModel for auxiliary windows
                 registry.register(viewModel, for: documentID)
             }
