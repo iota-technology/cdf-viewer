@@ -14,13 +14,24 @@ For release builds: `xcodebuild -scheme CDFViewer -configuration Release build`
 
 ## Release Process
 
-Push a semantic version tag to trigger GitHub Actions release:
-```bash
-git tag v1.0.0
-git push origin v1.0.0
-```
+1. Update `CHANGELOG.md` with new version section (follow Keep a Changelog format)
+2. Commit the changelog update
+3. Create an annotated tag with release notes from the changelog:
 
-The workflow builds an unsigned app zip and creates a GitHub release.
+   ```bash
+   git tag -a v1.0.0 -m "v1.0.0 - Brief description
+
+   Paste relevant changelog section here"
+   ```
+
+4. Push commits and tag:
+
+   ```bash
+   git push origin main
+   git push origin v1.0.0
+   ```
+
+The workflow builds an unsigned app zip and creates a GitHub release using the tag message as release notes.
 
 ## Gotchas
 
