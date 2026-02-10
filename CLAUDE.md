@@ -143,6 +143,27 @@ NavigationSplitView {
 
 Also add `.windowToolbarStyle(.unified)` to the WindowGroup for best results.
 
+**Popover content resize crash**: Any animated content change inside a `.popover()` that causes the popover to resize triggers a crash in `PopoverHostingView.updateAnimatedWindowSize`. This includes conditionally showing/hiding views with animation, VStacks that grow, etc. Fix by using fixed-layout approaches with opacity-only animations:
+
+```swift
+// Bad - VStack height changes cause crash
+VStack {
+    MainContent()
+    if isExpanded {
+        ExpandedContent()  // Crash when animated!
+    }
+}
+
+// Good - fixed layout, opacity-only animation
+VStack {
+    MainContent()
+    ExpandedContent()
+        .opacity(isExpanded ? 1 : 0)
+        .animation(.spring(), value: isExpanded)
+}
+.clipped()
+```
+
 ## CLAUDE.md Maintenance
 
 **Keep this file lean.** Only include:
