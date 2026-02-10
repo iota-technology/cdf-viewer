@@ -253,7 +253,8 @@ struct TimeSeriesChartView: View {
                 for (varName, components) in variableComponents {
                     guard let variable = file.variables.first(where: { $0.name == varName }) else { continue }
                     let values = try file.readDoubles(for: variable)
-                    let elementsPerRecord = variable.totalElements
+                    // Use displayColumnsPerRow for 2D arrays like [86400, 3] - this gives 3, not 259200
+                    let elementsPerRecord = variable.displayColumnsPerRow
                     let componentNames = self.componentNames(for: variable)
 
                     for component in components {
@@ -307,7 +308,8 @@ struct TimeSeriesChartView: View {
 
     /// Get component names for a vector variable
     private func componentNames(for variable: CDFVariable) -> [String] {
-        let count = variable.totalElements
+        // Use displayColumnsPerRow which correctly handles 2D arrays like [86400, 3]
+        let count = variable.displayColumnsPerRow
         if count == 3 {
             return ["X", "Y", "Z"]
         } else if count == 2 {

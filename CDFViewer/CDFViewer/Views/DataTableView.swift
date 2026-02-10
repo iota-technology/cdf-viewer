@@ -3,22 +3,35 @@ import SwiftUI
 struct DataTableView: View {
     @Bindable var viewModel: CDFViewModel
 
-    // Column widths
-    private let timeColumnWidth: CGFloat = 180
-    private let dataColumnWidth: CGFloat = 140
+    // Column widths - stored as state for resizing
+    @State private var timeColumnWidth: CGFloat = 250  // Fits "31 Dec 2024 at 23:53:43"
+    @State private var columnWidths: [String: CGFloat] = [:]  // key -> width
+    private let defaultDataColumnWidth: CGFloat = 140
+    private let minColumnWidth: CGFloat = 60
+
+    private func widthForColumn(_ key: String) -> CGFloat {
+        columnWidths[key] ?? defaultDataColumnWidth
+    }
+
+    private func columnWidthBinding(for key: String) -> Binding<CGFloat> {
+        Binding(
+            get: { columnWidths[key] ?? defaultDataColumnWidth },
+            set: { columnWidths[key] = $0 }
+        )
+    }
 
     private var totalWidth: CGFloat {
-        let dataColumns = viewModel.tableColumns.filter { $0.key != "time" }.count
-        return timeColumnWidth + CGFloat(dataColumns) * dataColumnWidth + 20
+        let dataColumnsWidth = viewModel.tableColumns
+            .filter { $0.key != "time" }
+            .reduce(0) { $0 + widthForColumn($1.key) }
+        return timeColumnWidth + dataColumnsWidth + 20
     }
 
     var body: some View {
         GeometryReader { geometry in
             VStack(spacing: 0) {
-                if viewModel.isLoadingData {
-                    ProgressView("Loading data...")
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else if let error = viewModel.dataError {
+                // Note: We don't show a loading indicator to avoid flash on quick updates
+                if let error = viewModel.dataError {
                     ErrorBanner(error: error)
                 } else if viewModel.tableColumns.isEmpty {
                     ContentUnavailableView(
@@ -32,18 +45,30 @@ struct DataTableView: View {
                     // Single horizontal ScrollView containing both header and data
                     ScrollView(.horizontal, showsIndicators: true) {
                         VStack(spacing: 0) {
-                            // Column headers
+                            // Column headers with resize handles
                             HStack(spacing: 0) {
                                 Text("Time")
                                     .font(.caption.weight(.semibold))
                                     .frame(width: timeColumnWidth, alignment: .leading)
                                     .padding(.horizontal, 8)
 
+                                // Time column resize handle
+                                ColumnResizeHandle(
+                                    width: $timeColumnWidth,
+                                    minWidth: minColumnWidth
+                                )
+
                                 ForEach(viewModel.tableColumns.filter { $0.key != "time" }) { column in
                                     Text(column.name)
                                         .font(.caption.weight(.semibold))
-                                        .frame(width: dataColumnWidth, alignment: .trailing)
+                                        .frame(width: widthForColumn(column.key), alignment: .trailing)
                                         .padding(.horizontal, 4)
+
+                                    // Data column resize handle
+                                    ColumnResizeHandle(
+                                        width: columnWidthBinding(for: column.key),
+                                        minWidth: minColumnWidth
+                                    )
                                 }
 
                                 Spacer(minLength: 0)
@@ -62,7 +87,8 @@ struct DataTableView: View {
                                             row: row,
                                             columns: viewModel.tableColumns,
                                             timeColumnWidth: timeColumnWidth,
-                                            dataColumnWidth: dataColumnWidth,
+                                            columnWidths: columnWidths,
+                                            defaultDataColumnWidth: defaultDataColumnWidth,
                                             effectiveWidth: effectiveWidth,
                                             isHighlighted: viewModel.cursorIndex == row.id,
                                             isPaused: viewModel.isCursorPaused && viewModel.cursorIndex == row.id,
@@ -138,33 +164,47 @@ struct TableRowView: View {
     let row: DataRow
     let columns: [DataColumn]
     let timeColumnWidth: CGFloat
-    let dataColumnWidth: CGFloat
+    let columnWidths: [String: CGFloat]
+    let defaultDataColumnWidth: CGFloat
     let effectiveWidth: CGFloat
     let isHighlighted: Bool
     let isPaused: Bool
     let onHover: (Bool) -> Void
     let onTap: () -> Void
 
+    private func widthForColumn(_ key: String) -> CGFloat {
+        columnWidths[key] ?? defaultDataColumnWidth
+    }
+
     var body: some View {
         HStack(spacing: 0) {
             Text(row.timestamp, format: .dateTime.year().month().day().hour().minute().second())
                 .font(.system(.body, design: .monospaced))
+                .lineLimit(1)
                 .frame(width: timeColumnWidth, alignment: .leading)
                 .padding(.horizontal, 8)
+
+            // Spacer for time column resize handle
+            Spacer().frame(width: 8)
 
             ForEach(columns.filter { $0.key != "time" }) { column in
                 if let value = row.values[column.key] {
                     Text(formatValue(value))
                         .font(.system(.body, design: .monospaced))
-                        .frame(width: dataColumnWidth, alignment: .trailing)
+                        .lineLimit(1)
+                        .frame(width: widthForColumn(column.key), alignment: .trailing)
                         .padding(.horizontal, 4)
                 } else {
                     Text("-")
                         .font(.system(.body, design: .monospaced))
-                        .frame(width: dataColumnWidth, alignment: .trailing)
+                        .lineLimit(1)
+                        .frame(width: widthForColumn(column.key), alignment: .trailing)
                         .foregroundStyle(.tertiary)
                         .padding(.horizontal, 4)
                 }
+
+                // Spacer for column resize handle
+                Spacer().frame(width: 8)
             }
 
             Spacer(minLength: 0)
@@ -233,6 +273,42 @@ struct TableFooterView: View {
         .padding(.horizontal)
         .padding(.vertical, 6)
         .background(.bar)
+    }
+}
+
+// MARK: - Column Resize Handle
+
+struct ColumnResizeHandle: View {
+    @Binding var width: CGFloat
+    let minWidth: CGFloat
+    @State private var isDragging = false
+    @State private var startWidth: CGFloat = 0
+
+    var body: some View {
+        Rectangle()
+            .fill(isDragging ? Color.accentColor : Color.clear)
+            .frame(width: 8, height: 20)
+            .contentShape(Rectangle())
+            .onHover { hovering in
+                if hovering {
+                    NSCursor.resizeLeftRight.push()
+                } else {
+                    NSCursor.pop()
+                }
+            }
+            .gesture(
+                DragGesture(minimumDistance: 1)
+                    .onChanged { value in
+                        if !isDragging {
+                            startWidth = width
+                            isDragging = true
+                        }
+                        width = max(minWidth, startWidth + value.translation.width)
+                    }
+                    .onEnded { _ in
+                        isDragging = false
+                    }
+            )
     }
 }
 

@@ -248,7 +248,8 @@ struct VariableSidebarView<TrailingContent: View>: View {
     // MARK: - Component Names
 
     private func componentNames(for variable: CDFVariable) -> [String] {
-        let count = variable.totalElements
+        // Use displayColumnsPerRow which correctly handles 2D arrays like [86400, 3]
+        let count = variable.displayColumnsPerRow
         if count == 3 {
             return ["X", "Y", "Z"]
         } else if count == 2 {
