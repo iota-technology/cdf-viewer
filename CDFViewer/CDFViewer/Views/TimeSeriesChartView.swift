@@ -18,14 +18,19 @@ struct TimeSeriesChartView: View {
     @State private var isLoading = false
     @State private var errorMessage: String?
 
-    // Hover state
-    @State private var hoverIndex: Int?
+    // Hover state - tracks date directly for cross-series support
+    @State private var hoverDate: Date?
     @State private var isPaused = false
-    @State private var pausedIndex: Int?
+    @State private var pausedDate: Date?
 
-    // Computed active index (paused or hovered)
-    private var activeIndex: Int? {
-        isPaused ? pausedIndex : hoverIndex
+    // Computed active date (paused or hovered)
+    private var activeDate: Date? {
+        isPaused ? pausedDate : hoverDate
+    }
+
+    // Reference series (the one with most points) for lookups
+    private var referenceSeries: ChartSeries? {
+        chartSeries.max(by: { $0.points.count < $1.points.count })
     }
 
     var body: some View {
@@ -120,11 +125,9 @@ struct TimeSeriesChartView: View {
 
             // Show current timestamp on hover (only for selected time variable)
             if selectedTimeVariable == variable,
-               let index = activeIndex,
-               let firstSeries = chartSeries.first,
-               index < firstSeries.points.count {
+               let date = activeDate {
                 HStack(spacing: 4) {
-                    Text(firstSeries.points[index].date, format: .dateTime.hour().minute().second())
+                    Text(date, format: .dateTime.month().day().hour().minute().second())
                         .font(.system(size: 11, design: .monospaced))
                         .foregroundStyle(.secondary)
                     if isPaused {
@@ -316,15 +319,16 @@ struct TimeSeriesChartView: View {
                 ForEach(series.points) { point in
                     LineMark(
                         x: .value("Time", point.date),
-                        y: .value(series.name, point.value)
+                        y: .value(series.name, point.value),
+                        series: .value("Series", series.name)
                     )
                     .foregroundStyle(Self.chartColors[index % Self.chartColors.count])
                 }
             }
 
             // Vertical cursor line
-            if let index = activeIndex, let firstSeries = chartSeries.first, index < firstSeries.points.count {
-                RuleMark(x: .value("Cursor", firstSeries.points[index].date))
+            if let date = activeDate {
+                RuleMark(x: .value("Cursor", date))
                     .foregroundStyle(.gray.opacity(0.5))
                     .lineStyle(StrokeStyle(lineWidth: 1, dash: [5, 5]))
             }
@@ -333,7 +337,7 @@ struct TimeSeriesChartView: View {
             AxisMarks(values: .automatic) { _ in
                 AxisGridLine()
                 AxisTick()
-                AxisValueLabel(format: .dateTime.hour().minute())
+                AxisValueLabel(format: .dateTime.month().day().hour().minute())
             }
         }
         .chartYAxis {
@@ -349,52 +353,54 @@ struct TimeSeriesChartView: View {
                         guard !isPaused else { return }
                         switch phase {
                         case .active(let location):
-                            updateHoverIndex(at: location, proxy: proxy)
+                            // Adjust for plot area offset (accounts for y-axis labels)
+                            if let plotFrame = proxy.plotFrame {
+                                let plotRect = geometry[plotFrame]
+                                let adjustedX = location.x - plotRect.origin.x
+                                // Only update if within plot area bounds
+                                if adjustedX >= 0 && adjustedX <= plotRect.width {
+                                    if let date: Date = proxy.value(atX: adjustedX) {
+                                        hoverDate = date
+                                    }
+                                }
+                            }
                         case .ended:
-                            hoverIndex = nil
+                            hoverDate = nil
                         }
                     }
                     .onTapGesture {
                         if isPaused {
                             isPaused = false
-                            pausedIndex = nil
-                        } else if hoverIndex != nil {
+                            pausedDate = nil
+                        } else if hoverDate != nil {
                             isPaused = true
-                            pausedIndex = hoverIndex
+                            pausedDate = hoverDate
                         }
                     }
             }
-        }
-    }
-
-    private func updateHoverIndex(at location: CGPoint, proxy: ChartProxy) {
-        guard let firstSeries = chartSeries.first, !firstSeries.points.isEmpty else { return }
-
-        if let date: Date = proxy.value(atX: location.x) {
-            // Find closest point index
-            var closestIndex = 0
-            var closestDistance = Double.infinity
-
-            for (index, point) in firstSeries.points.enumerated() {
-                let distance = abs(point.date.timeIntervalSince(date))
-                if distance < closestDistance {
-                    closestDistance = distance
-                    closestIndex = index
-                }
-            }
-
-            hoverIndex = closestIndex
         }
     }
 
     // MARK: - Value Display
 
     private func getCurrentValue(for key: String) -> Double? {
-        guard let index = activeIndex else { return nil }
+        guard let date = activeDate else { return nil }
 
         for series in chartSeries {
-            if series.name == key && index < series.points.count {
-                return series.points[index].value
+            if series.name == key, !series.points.isEmpty {
+                // Find closest point to the active date
+                var closestPoint: ChartPoint?
+                var closestDistance = Double.infinity
+
+                for point in series.points {
+                    let distance = abs(point.date.timeIntervalSince(date))
+                    if distance < closestDistance {
+                        closestDistance = distance
+                        closestPoint = point
+                    }
+                }
+
+                return closestPoint?.value
             }
         }
         return nil
@@ -426,9 +432,9 @@ struct TimeSeriesChartView: View {
 
         isLoading = true
         errorMessage = nil
-        hoverIndex = nil
+        hoverDate = nil
         isPaused = false
-        pausedIndex = nil
+        pausedDate = nil
 
         Task { @MainActor in
             do {
