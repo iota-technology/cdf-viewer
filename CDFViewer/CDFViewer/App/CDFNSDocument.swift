@@ -85,6 +85,7 @@ class CDFNSDocument: NSDocument {
     override func write(to url: URL, ofType typeName: String) throws {
         throw CocoaError(.fileWriteNoPermission)
     }
+
 }
 
 // MARK: - SwiftUI Bridge View
@@ -128,8 +129,6 @@ struct DocumentContentView: View {
                             .frame(width: 400, height: 500)
                     }
                 }
-
-                Divider()
 
                 Button {
                     openAuxiliaryWindow(id: "Time Series Chart")
