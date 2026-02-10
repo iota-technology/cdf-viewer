@@ -47,17 +47,30 @@ private struct SidebarBackgroundModifier: ViewModifier {
 
 /// Adds a left-aligned sidebar toggle button to the toolbar.
 /// This uses the native NSSplitViewController.toggleSidebar action for proper macOS integration.
+/// Uses a delay to avoid the empty Liquid Glass pill that appears when toolbar items are added
+/// before the window's toolbar is fully initialized.
 struct SidebarToggleToolbarModifier: ViewModifier {
+    @State private var isViewReady = false
+
     func body(content: Content) -> some View {
         content
             .toolbar {
-                ToolbarItem(placement: .navigation) {
-                    Button {
-                        toggleSidebar()
-                    } label: {
-                        Image(systemName: "sidebar.leading")
+                if isViewReady {
+                    ToolbarItem(placement: .navigation) {
+                        Button {
+                            toggleSidebar()
+                        } label: {
+                            Image(systemName: "sidebar.leading")
+                        }
+                        .help("Toggle Sidebar")
                     }
-                    .help("Toggle Sidebar")
+                }
+            }
+            .onAppear {
+                // Small delay allows the window's toolbar to fully initialize,
+                // preventing the empty Liquid Glass pill from appearing
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                    isViewReady = true
                 }
             }
     }

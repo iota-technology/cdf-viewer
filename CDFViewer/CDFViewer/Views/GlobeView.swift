@@ -62,9 +62,9 @@ struct GlobeView: View {
         } detail: {
             globeAreaView
         }
+        .toolbarBackground(.hidden, for: .windowToolbar)
         .sidebarToggleToolbar()
         .toolbar(removing: .sidebarToggle)
-        .toolbarBackground(.hidden, for: .windowToolbar)
         .onAppear {
             setupInitialSelection()
         }

@@ -31,9 +31,9 @@ struct TimeSeriesChartView: View {
             // Chart area
             chartAreaView
         }
+        .toolbarBackground(.hidden, for: .windowToolbar)
         .sidebarToggleToolbar()
         .toolbar(removing: .sidebarToggle)
-        .toolbarBackground(.hidden, for: .windowToolbar)
         .onAppear {
             setupInitialSelection()
         }

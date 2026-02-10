@@ -64,13 +64,6 @@ class CDFNSDocument: NSDocument {
         window.titlebarAppearsTransparent = false
         window.toolbarStyle = .unified
 
-        // Configure toolbar with sidebar toggle for Liquid Glass
-        let toolbar = NSToolbar(identifier: "DocumentToolbar")
-        toolbar.displayMode = .iconOnly
-        toolbar.showsBaselineSeparator = false
-        toolbar.delegate = ToolbarDelegate.shared
-        window.toolbar = toolbar
-
         let windowController = NSWindowController(window: window)
         windowController.contentViewController = hostingController
         addWindowController(windowController)
@@ -114,8 +107,6 @@ struct DocumentContentView: View {
                 DataTableView(viewModel: documentWrapper.viewModel)
             }
         }
-        .sidebarToggleToolbar()
-        .toolbar(removing: .sidebarToggle)
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
                 Button {
@@ -147,6 +138,8 @@ struct DocumentContentView: View {
         }
         .navigationTitle(documentWrapper.document.cdfFile?.fileName ?? "CDF Viewer")
         .toolbarBackground(.hidden, for: .windowToolbar)
+        .sidebarToggleToolbar()
+        .toolbar(removing: .sidebarToggle)
     }
 
     private func openAuxiliaryWindow(id: String) {
@@ -175,20 +168,3 @@ extension Notification.Name {
     static let openAuxiliaryWindow = Notification.Name("openAuxiliaryWindow")
 }
 
-// MARK: - Toolbar Delegate (empty - SwiftUI handles all toolbar items)
-
-class ToolbarDelegate: NSObject, NSToolbarDelegate {
-    static let shared = ToolbarDelegate()
-
-    func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
-        [.flexibleSpace]
-    }
-
-    func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
-        [.flexibleSpace, .space]
-    }
-
-    func toolbar(_ toolbar: NSToolbar, itemForItemIdentifier itemIdentifier: NSToolbarItem.Identifier, willBeInsertedIntoToolbar flag: Bool) -> NSToolbarItem? {
-        nil
-    }
-}

@@ -76,7 +76,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         window.title = "Time Series Chart"
         window.styleMask.insert(.fullSizeContentView)
         window.toolbarStyle = .unified
-        configureToolbar(for: window, identifier: "ChartToolbar")
+
+        // Add empty toolbar so Liquid Glass effect is present from the start
+        // (prevents jarring switch when SwiftUI toolbar items appear)
+        let toolbar = NSToolbar(identifier: "ChartToolbar")
+        toolbar.displayMode = .iconOnly
+        window.toolbar = toolbar
 
         window.makeKeyAndOrderFront(nil)
         chartWindows[id] = window
@@ -100,36 +105,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         window.toolbarStyle = .unified
         window.backgroundColor = .black
         window.titlebarAppearsTransparent = true
-        configureToolbar(for: window, identifier: "GlobeToolbar")
+
+        // Add empty toolbar so Liquid Glass effect is present from the start
+        // (prevents jarring switch when SwiftUI toolbar items appear)
+        let toolbar = NSToolbar(identifier: "GlobeToolbar")
+        toolbar.displayMode = .iconOnly
+        window.toolbar = toolbar
 
         window.makeKeyAndOrderFront(nil)
         globeWindows[id] = window
-    }
-
-    /// Configure toolbar with sidebar toggle for Liquid Glass title bar integration
-    private func configureToolbar(for window: NSWindow, identifier: String) {
-        let toolbar = NSToolbar(identifier: identifier)
-        toolbar.displayMode = .iconOnly
-        toolbar.showsBaselineSeparator = false
-        toolbar.delegate = AuxiliaryToolbarDelegate.shared
-        window.toolbar = toolbar
-    }
-}
-
-// MARK: - Auxiliary Window Toolbar Delegate (empty - SwiftUI handles all toolbar items)
-
-class AuxiliaryToolbarDelegate: NSObject, NSToolbarDelegate {
-    static let shared = AuxiliaryToolbarDelegate()
-
-    func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
-        [.flexibleSpace]
-    }
-
-    func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
-        [.flexibleSpace, .space]
-    }
-
-    func toolbar(_ toolbar: NSToolbar, itemForItemIdentifier itemIdentifier: NSToolbarItem.Identifier, willBeInsertedIntoToolbar flag: Bool) -> NSToolbarItem? {
-        nil
     }
 }
