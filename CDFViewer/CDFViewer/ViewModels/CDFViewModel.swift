@@ -18,13 +18,23 @@ final class CDFViewModel {
         didSet { loadTableData() }
     }
     var tableSelectedComponents: Set<String> = [] {  // "varName" or "varName.X"
-        didSet { loadTableData() }
+        didSet {
+            // Track newly added components as "loading"
+            let added = tableSelectedComponents.subtracting(oldValue)
+            if !added.isEmpty {
+                loadingComponents.formUnion(added)
+            }
+            loadTableData()
+        }
     }
 
     // Table data - array-based for fast index access (no per-row object allocation)
     private(set) var tableColumns: [DataColumn] = []
     private(set) var isLoadingData = false
     private(set) var dataError: CDFError?
+
+    /// Components currently being loaded (for showing spinners in sidebar)
+    private(set) var loadingComponents: Set<String> = []
 
     // Full dataset stored as contiguous arrays for O(1) access
     private(set) var allTimestamps: [Date] = []
@@ -256,18 +266,21 @@ final class CDFViewModel {
                 self.tableColumns = columns
                 self.allTimestamps = timestamps
                 self.columnData = newColumnData
+                self.loadingComponents = []
                 isLoadingData = false
             } catch let error as CDFError {
                 dataError = error
                 tableColumns = []
                 allTimestamps = []
                 columnData = [:]
+                loadingComponents = []
                 isLoadingData = false
             } catch {
                 dataError = .corruptedData(error.localizedDescription)
                 tableColumns = []
                 allTimestamps = []
                 columnData = [:]
+                loadingComponents = []
                 isLoadingData = false
             }
         }

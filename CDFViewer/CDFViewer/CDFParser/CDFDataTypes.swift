@@ -189,6 +189,32 @@ enum CDFEncoding: Int32 {
             return false
         }
     }
+
+    /// Human-readable display name
+    var displayName: String {
+        switch self {
+        case .network: return "Network (XDR)"
+        case .sun: return "Sun"
+        case .vax: return "VAX"
+        case .decstation: return "DECstation"
+        case .sgi: return "SGI"
+        case .ibmpc: return "IBM PC"
+        case .ibmrs: return "IBM RS"
+        case .host: return "Host"
+        case .ppc: return "PowerPC"
+        case .hp: return "HP"
+        case .neXT: return "NeXT"
+        case .alphaosf1: return "Alpha OSF/1"
+        case .alphavmsd: return "Alpha VMS D"
+        case .alphavmsg: return "Alpha VMS G"
+        case .alphavmsi: return "Alpha VMS I"
+        case .arm_little: return "ARM (little-endian)"
+        case .arm_big: return "ARM (big-endian)"
+        case .ia64vms_i: return "IA64 VMS I"
+        case .ia64vms_d: return "IA64 VMS D"
+        case .ia64vms_g: return "IA64 VMS G"
+        }
+    }
 }
 
 /// CDF majority (row vs column major)

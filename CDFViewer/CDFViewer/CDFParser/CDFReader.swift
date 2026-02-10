@@ -382,7 +382,7 @@ final class CDFReader {
         CDFFileInfo(
             url: url,
             version: cdr.map { "\($0.version).\($0.release)" } ?? "Unknown",
-            encoding: cdr?.encoding.rawValue.description ?? "Unknown",
+            encoding: cdr?.encoding.displayName ?? "Unknown",
             majority: gdr.map { $0.rNumDims > 0 ? "Row" : "N/A" } ?? "Unknown",
             numVariables: variables.count,
             numAttributes: attributes.count,

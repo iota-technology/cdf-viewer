@@ -35,6 +35,9 @@ struct VariableSidebarView<TrailingContent: View>: View {
     /// Returns the current hover value for a component key (nil = don't show)
     var valueForKey: ((String) -> Double?)?
 
+    /// Set of component keys currently loading (show spinner instead of checkbox)
+    var loadingKeys: Set<String> = []
+
     /// Callback when info button is tapped on a variable (for external handling)
     var onInfoTapped: ((CDFVariable) -> Void)?
 
@@ -197,15 +200,23 @@ struct VariableSidebarView<TrailingContent: View>: View {
     private func multiSelectionRow(_ variable: CDFVariable) -> some View {
         let disabled = isDisabled?(variable) ?? false
         let shouldExpand = expandVectors && variable.isVector
+        // Check if any component of this variable is loading
+        let isLoading = isVariableLoading(variable, expanded: shouldExpand)
 
         return VStack(alignment: .leading, spacing: 0) {
             // Main variable row
             HStack {
                 HStack {
                     let isAnySelected = isVariableOrComponentSelected(variable)
-                    Image(systemName: isAnySelected ? "checkmark.square.fill" : "square")
-                        .foregroundStyle(disabled ? Color.gray.opacity(0.3) : (isAnySelected ? Color.blue : Color.secondary))
-                        .font(.system(size: 12))
+                    if isLoading {
+                        ProgressView()
+                            .scaleEffect(0.5)
+                            .frame(width: 14, height: 14)
+                    } else {
+                        Image(systemName: isAnySelected ? "checkmark.square.fill" : "square")
+                            .foregroundStyle(disabled ? Color.gray.opacity(0.3) : (isAnySelected ? Color.blue : Color.secondary))
+                            .font(.system(size: 12))
+                    }
 
                     VStack(alignment: .leading, spacing: 1) {
                         Text(variable.name)
@@ -294,11 +305,18 @@ struct VariableSidebarView<TrailingContent: View>: View {
     private func componentRow(variable: CDFVariable, component: String, disabled: Bool) -> some View {
         let key = "\(variable.name).\(component)"
         let isSelected = multiSelection.contains(key)
+        let isLoading = loadingKeys.contains(key)
 
         return HStack {
-            Image(systemName: isSelected ? "checkmark.square.fill" : "square")
-                .foregroundStyle(disabled ? Color.gray.opacity(0.3) : (isSelected ? Color.blue : Color.secondary))
-                .font(.system(size: 11))
+            if isLoading {
+                ProgressView()
+                    .scaleEffect(0.45)
+                    .frame(width: 13, height: 13)
+            } else {
+                Image(systemName: isSelected ? "checkmark.square.fill" : "square")
+                    .foregroundStyle(disabled ? Color.gray.opacity(0.3) : (isSelected ? Color.blue : Color.secondary))
+                    .font(.system(size: 11))
+            }
 
             Text(component)
                 .font(.system(size: 12))
@@ -358,6 +376,16 @@ struct VariableSidebarView<TrailingContent: View>: View {
         }
     }
 
+    private func isVariableLoading(_ variable: CDFVariable, expanded: Bool) -> Bool {
+        if variable.isVector && expanded {
+            // Check if any component is loading
+            let components = componentNames(for: variable)
+            return components.contains { loadingKeys.contains("\(variable.name).\($0)") }
+        } else {
+            return loadingKeys.contains(variable.name)
+        }
+    }
+
     private func toggleVariable(_ variable: CDFVariable, expanded: Bool = true) {
         if variable.isVector && expanded {
             // Expanded mode: toggle all component keys
@@ -413,6 +441,7 @@ extension VariableSidebarView where TrailingContent == EmptyView {
         selection: Binding<CDFVariable?>,
         showDataTypeInfo: Bool = true,
         isDisabled: ((CDFVariable) -> Bool)? = nil,
+        loadingKeys: Set<String> = [],
         viewModel: CDFViewModel? = nil,
         showPositionalToggle: Bool = false,
         onInfoTapped: ((CDFVariable) -> Void)? = nil
@@ -425,6 +454,7 @@ extension VariableSidebarView where TrailingContent == EmptyView {
         self.showDataTypeInfo = showDataTypeInfo
         self.expandVectors = true
         self.isDisabled = isDisabled
+        self.loadingKeys = loadingKeys
         self.viewModel = viewModel
         self.showPositionalToggle = showPositionalToggle
         self.onInfoTapped = onInfoTapped
@@ -441,6 +471,7 @@ extension VariableSidebarView where TrailingContent == EmptyView {
         isDisabled: ((CDFVariable) -> Bool)? = nil,
         colorForKey: ((String) -> Color?)? = nil,
         valueForKey: ((String) -> Double?)? = nil,
+        loadingKeys: Set<String> = [],
         viewModel: CDFViewModel? = nil,
         showPositionalToggle: Bool = false,
         onInfoTapped: ((CDFVariable) -> Void)? = nil
@@ -453,6 +484,7 @@ extension VariableSidebarView where TrailingContent == EmptyView {
         self.isDisabled = isDisabled
         self.colorForKey = colorForKey
         self.valueForKey = valueForKey
+        self.loadingKeys = loadingKeys
         self.viewModel = viewModel
         self.showPositionalToggle = showPositionalToggle
         self.onInfoTapped = onInfoTapped
@@ -471,6 +503,7 @@ extension VariableSidebarView {
         isDisabled: ((CDFVariable) -> Bool)? = nil,
         colorForKey: ((String) -> Color?)? = nil,
         valueForKey: ((String) -> Double?)? = nil,
+        loadingKeys: Set<String> = [],
         viewModel: CDFViewModel? = nil,
         showPositionalToggle: Bool = false,
         onInfoTapped: ((CDFVariable) -> Void)? = nil,
@@ -484,6 +517,7 @@ extension VariableSidebarView {
         self.isDisabled = isDisabled
         self.colorForKey = colorForKey
         self.valueForKey = valueForKey
+        self.loadingKeys = loadingKeys
         self.viewModel = viewModel
         self.showPositionalToggle = showPositionalToggle
         self.onInfoTapped = onInfoTapped

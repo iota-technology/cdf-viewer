@@ -26,6 +26,7 @@ struct VariableListView: View {
                 multiSelection: $viewModel.tableSelectedComponents,
                 sections: sidebarSections,
                 showDataTypeInfo: true,
+                loadingKeys: viewModel.loadingComponents,
                 viewModel: viewModel,
                 showPositionalToggle: false
             )
