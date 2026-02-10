@@ -120,7 +120,7 @@ struct TimeSeriesChartView: View {
                         y: .value(series.name, point.value),
                         series: .value("Series", series.name)
                     )
-                    .foregroundStyle(chartColorPalette[index % chartColorPalette.count])
+                    .foregroundStyle(colorForSeries(name: series.name, index: index))
                 }
             }
             // Cursor line moved to overlay to prevent chart re-renders on hover
@@ -347,12 +347,38 @@ struct TimeSeriesChartView: View {
         return points
     }
 
-    /// Get the color for a series by name (based on its index in chartSeries)
+    /// Get the color for a series by name, respecting custom colors and vector component hue shifts
     private func seriesColor(for name: String) -> Color? {
         guard let index = chartSeries.firstIndex(where: { $0.name == name }) else {
             return nil
         }
-        return chartColorPalette[index % chartColorPalette.count]
+        return colorForSeries(name: name, index: index)
+    }
+
+    /// Get color for a series, handling both scalar variables and vector components
+    private func colorForSeries(name: String, index: Int) -> Color {
+        // Check if this is a vector component (e.g., "VarName.X", "VarName.Y", "VarName.Z")
+        if name.contains(".") {
+            let parts = name.split(separator: ".")
+            let varName = String(parts[0])
+            let component = String(parts[1])
+
+            // Find the index of the FIRST component of this variable for consistent base color
+            // All components (X, Y, Z) should share the same base color
+            let firstComponentIndex = chartSeries.firstIndex(where: { $0.name.hasPrefix(varName + ".") }) ?? index
+            let baseColor = viewModel.colorFor(varName, index: firstComponentIndex, palette: chartColorPalette)
+
+            // Apply hue shift based on component
+            switch component {
+            case "X": return baseColor
+            case "Y": return baseColor.hueShifted(by: 30)
+            case "Z": return baseColor.hueShifted(by: 60)
+            default: return baseColor
+            }
+        } else {
+            // Scalar variable - use custom color or palette
+            return viewModel.colorFor(name, index: index, palette: chartColorPalette)
+        }
     }
 
     /// Get component names for a vector variable

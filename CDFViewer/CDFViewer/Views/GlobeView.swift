@@ -157,7 +157,8 @@ struct GlobeView: View {
         guard let index = Array(selectedPositionVariables.sorted()).firstIndex(of: name) else {
             return nil
         }
-        return trackColorPalette[index % trackColorPalette.count]
+        // Use custom color from metadata if set, otherwise use palette
+        return viewModel.colorFor(name, index: index, palette: trackColorPalette)
     }
 
     /// Colors for multiple tracks
@@ -355,7 +356,7 @@ struct GlobeView: View {
             trackVerticesCache[varName] = vertices
 
             // Create track node
-            let color = nsColorForTrack(index: index)
+            let color = nsColorForTrack(varName: varName, index: index)
             let node = createTrackNode(vertices: vertices, color: color, name: "track_\(varName)")
             scene.rootNode.addChildNode(node)
             trackNodes[varName] = node
@@ -407,9 +408,10 @@ struct GlobeView: View {
         return node
     }
 
-    private func nsColorForTrack(index: Int) -> NSColor {
-        let colors: [NSColor] = [.yellow, .cyan, .green, .orange, .magenta, .purple]
-        return colors[index % colors.count]
+    private func nsColorForTrack(varName: String, index: Int) -> NSColor {
+        // Use custom color from metadata if set
+        let swiftColor = viewModel.colorFor(varName, index: index, palette: trackColorPalette)
+        return NSColor(swiftColor)
     }
 
     /// Updates track visibility based on current progress

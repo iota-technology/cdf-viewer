@@ -157,7 +157,8 @@ struct VariableSidebarView<TrailingContent: View>: View {
                         VariableInfoPopover(
                             variable: variable,
                             viewModel: vm,
-                            showPositionalToggle: showPositionalToggle
+                            showPositionalToggle: showPositionalToggle,
+                            defaultColor: colorForKey?(variable.name) ?? .blue
                         )
                     }
                 }
@@ -249,7 +250,8 @@ struct VariableSidebarView<TrailingContent: View>: View {
                             VariableInfoPopover(
                                 variable: variable,
                                 viewModel: vm,
-                                showPositionalToggle: showPositionalToggle
+                                showPositionalToggle: showPositionalToggle,
+                                defaultColor: colorForKey?(variable.name) ?? .blue
                             )
                         }
                     }

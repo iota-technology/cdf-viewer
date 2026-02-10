@@ -5,26 +5,28 @@ struct VariableInfoPopover: View {
     let variable: CDFVariable
     var viewModel: CDFViewModel
     let showPositionalToggle: Bool
+    let defaultColor: Color
 
     @State private var selectedColor: Color = .blue
     @State private var isPositional: Bool = false
     @State private var isHoveringColor: Bool = false
     @State private var hoverDismissTask: DispatchWorkItem?
 
-    init(variable: CDFVariable, viewModel: CDFViewModel, showPositionalToggle: Bool = false) {
+    init(variable: CDFVariable, viewModel: CDFViewModel, showPositionalToggle: Bool = false, defaultColor: Color = .blue) {
         self.variable = variable
         self.viewModel = viewModel
         self.showPositionalToggle = showPositionalToggle
+        self.defaultColor = defaultColor
 
         // Initialize state from view model
         let metadata = viewModel.metadata(for: variable.name)
         _isPositional = State(initialValue: metadata.isPositional ?? variable.isECEFPosition)
 
-        // Use custom color if set, otherwise use a default from palette
+        // Use custom color if set, otherwise use the default color passed in
         if let hexColor = metadata.customColor, let color = Color(hex: hexColor) {
             _selectedColor = State(initialValue: color)
         } else {
-            _selectedColor = State(initialValue: .blue)
+            _selectedColor = State(initialValue: defaultColor)
         }
     }
 
