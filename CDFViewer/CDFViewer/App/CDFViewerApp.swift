@@ -37,6 +37,7 @@ struct CDFViewerApp: App {
             }
         }
         .defaultSize(width: 900, height: 700)
+        .windowToolbarStyle(.unified)
         .commandsRemoved()
     }
 }

@@ -51,10 +51,15 @@ struct GlobeView: View {
 
     var body: some View {
         NavigationSplitView {
-            sidebarView
-                .navigationSplitViewColumnWidth(min: 200, ideal: 280, max: 400)
+            List {
+                sidebarView
+            }
+            .listStyle(.sidebar)
+            .navigationSplitViewColumnWidth(min: 200, ideal: 280, max: 400)
         } detail: {
             globeAreaView
+                .navigationTitle("3D Globe")
+                .toolbarBackground(.hidden, for: .windowToolbar)
         }
         .onAppear {
             setupInitialSelection()

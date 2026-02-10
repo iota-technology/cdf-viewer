@@ -122,6 +122,20 @@ Chart {
 2. `PBXFileReference` section - defines the file itself
 3. `PBXGroup` section - adds file to the appropriate folder/group in the navigator
 
+**macOS Tahoe Liquid Glass toolbar**: In NavigationSplitView, the toolbar glass effect stops at the sidebar edge by default, creating an ugly visual break. Fix by hiding the toolbar background on the detail view, which allows Liquid Glass to flow continuously:
+
+```swift
+NavigationSplitView {
+    sidebar
+} detail: {
+    detailView
+        .navigationTitle("Title")
+        .toolbarBackground(.hidden, for: .windowToolbar)
+}
+```
+
+Also add `.windowToolbarStyle(.unified)` to the WindowGroup for best results.
+
 ## CLAUDE.md Maintenance
 
 **Keep this file lean.** Only include:
