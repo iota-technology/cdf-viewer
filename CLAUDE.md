@@ -43,6 +43,8 @@ The workflow builds an unsigned app zip and creates a GitHub release.
 
 **App icons**: macOS Big Sur+ displays all icons in a squircle mask. Design icons to work within this shape or they'll look odd.
 
+**Unsigned app quarantine**: Downloaded unsigned apps get quarantined by macOS, showing "damaged and can't be opened". Users must run `xattr -cr /path/to/App.app` before opening.
+
 ## CLAUDE.md Maintenance
 
 **Keep this file lean.** Only include:

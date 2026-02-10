@@ -79,8 +79,13 @@ jobs:
 
             ### Installation
             1. Download `CDFViewer-${{ steps.version.outputs.version }}.zip`
-            2. Unzip and drag `CDFViewer.app` to your Applications folder
-            3. On first launch, right-click the app and select "Open" to bypass Gatekeeper
+            2. Unzip the archive
+            3. **Important:** Remove the quarantine attribute (required for unsigned apps):
+               ```bash
+               xattr -cr ~/Downloads/CDFViewer.app
+               ```
+            4. Drag `CDFViewer.app` to your Applications folder
+            5. Open the app (if prompted, right-click → Open)
 
             ### Requirements
             - macOS 14.0 (Sonoma) or later
