@@ -121,13 +121,7 @@ struct TimeSeriesChartView: View {
                     .foregroundStyle(chartColorPalette[index % chartColorPalette.count])
                 }
             }
-
-            // Vertical cursor line
-            if let date = activeDate {
-                RuleMark(x: .value("Cursor", date))
-                    .foregroundStyle(viewModel.isCursorPaused ? .orange.opacity(0.7) : .gray.opacity(0.5))
-                    .lineStyle(StrokeStyle(lineWidth: viewModel.isCursorPaused ? 2 : 1, dash: viewModel.isCursorPaused ? [] : [5, 5]))
-            }
+            // Cursor line moved to overlay to prevent chart re-renders on hover
         }
         .chartXAxis {
             AxisMarks(values: .automatic) { _ in
@@ -142,6 +136,25 @@ struct TimeSeriesChartView: View {
         .chartLegend(.hidden)
         .chartOverlay { proxy in
             GeometryReader { geometry in
+                // Draw cursor line as Path overlay (avoids chart re-render)
+                if let date = activeDate, let plotFrame = proxy.plotFrame {
+                    let plotRect = geometry[plotFrame]
+                    if let xPosition = proxy.position(forX: date) {
+                        Path { path in
+                            path.move(to: CGPoint(x: plotRect.origin.x + xPosition, y: plotRect.origin.y))
+                            path.addLine(to: CGPoint(x: plotRect.origin.x + xPosition, y: plotRect.origin.y + plotRect.height))
+                        }
+                        .stroke(
+                            viewModel.isCursorPaused ? Color.orange.opacity(0.7) : Color.gray.opacity(0.5),
+                            style: StrokeStyle(
+                                lineWidth: viewModel.isCursorPaused ? 2 : 1,
+                                dash: viewModel.isCursorPaused ? [] : [5, 5]
+                            )
+                        )
+                    }
+                }
+
+                // Invisible rectangle for mouse tracking
                 Rectangle()
                     .fill(.clear)
                     .contentShape(Rectangle())
