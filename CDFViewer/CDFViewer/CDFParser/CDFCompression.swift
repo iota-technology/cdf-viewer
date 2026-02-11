@@ -14,7 +14,10 @@ enum CDFCompressionType: Int32 {
 enum CDFCompression {
 
     /// Decompress GZIP-compressed data
-    static func decompressGZIP(_ data: Data) throws -> Data {
+    /// - Parameters:
+    ///   - data: The GZIP-compressed data
+    ///   - expectedSize: Optional expected uncompressed size (from CVVR uSize) for proper buffer allocation
+    static func decompressGZIP(_ data: Data, expectedSize: Int? = nil) throws -> Data {
         // GZIP data starts with magic bytes 0x1f 0x8b
         guard data.count >= 10,
               data[data.startIndex] == 0x1f,
@@ -65,19 +68,23 @@ enum CDFCompression {
         let compressedData = data[(data.startIndex + headerSize)..<(data.endIndex - trailerSize)]
 
         // Use Compression framework with raw deflate (ZLIB without header)
-        return try decompressDeflate(Data(compressedData))
+        return try decompressDeflate(Data(compressedData), expectedSize: expectedSize)
     }
 
     /// Decompress raw deflate data using Compression framework
-    private static func decompressDeflate(_ data: Data) throws -> Data {
-        // Allocate destination buffer - start with reasonable size
-        var destinationBuffer = [UInt8](repeating: 0, count: data.count * 20)
+    /// - Parameters:
+    ///   - data: Raw deflate-compressed data
+    ///   - expectedSize: Optional expected output size for proper buffer allocation
+    private static func decompressDeflate(_ data: Data, expectedSize: Int? = nil) throws -> Data {
+        // Use expected size if provided, otherwise estimate with generous multiplier
+        let bufferSize = expectedSize ?? (data.count * 50)
+        var destinationBuffer = [UInt8](repeating: 0, count: bufferSize)
 
         let decompressedSize = data.withUnsafeBytes { sourcePtr -> Int in
             guard let sourceBase = sourcePtr.baseAddress else { return 0 }
             return compression_decode_buffer(
                 &destinationBuffer,
-                destinationBuffer.count,
+                bufferSize,
                 sourceBase.assumingMemoryBound(to: UInt8.self),
                 data.count,
                 nil,

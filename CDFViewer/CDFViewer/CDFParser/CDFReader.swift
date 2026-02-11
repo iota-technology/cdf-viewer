@@ -265,7 +265,12 @@ final class CDFReader {
                     guard let compressedData = reader.readBytes(Int(cvvr.compressedSize)) else {
                         throw CDFError.dataReadFailed(variable: variable.name, reason: "Cannot read compressed data")
                     }
-                    let decompressed = try CDFCompression.decompressGZIP(compressedData)
+                    // Calculate expected uncompressed size from variable metadata
+                    // (records * elements per record * bytes per element)
+                    let recordsInEntry = Int(entry.last - entry.first + 1)
+                    let elementsPerRecord = variable.dimensions.isEmpty ? variable.numElements : variable.dimensions.reduce(1, *)
+                    let expectedSize = recordsInEntry * elementsPerRecord * variable.dataType.byteSize
+                    let decompressed = try CDFCompression.decompressGZIP(compressedData, expectedSize: expectedSize)
                     allData.append(decompressed)
                 } else {
                     warnings.append(CDFWarning(

@@ -266,6 +266,7 @@ final class CDFViewModel {
                 self.tableColumns = columns
                 self.allTimestamps = timestamps
                 self.columnData = newColumnData
+
                 self.loadingComponents = []
                 isLoadingData = false
             } catch let error as CDFError {
