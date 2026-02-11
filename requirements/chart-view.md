@@ -18,12 +18,20 @@ Time series visualization for selected variables. Opens as an auxiliary window f
 - Data variables for Y-axis (multi-select)
 - Each selected variable gets its own colored line
 
-### Unit Constraints
+### Variable Association Constraints
 
-- All selected variables must share the same unit (for meaningful Y-axis)
-- Variables with different units are disabled in the sidebar
-- Disabled variables show tooltip explaining the constraint
-- Deselecting all variables unlocks unit selection again
+Variables are disabled based on two checks (in priority order):
+
+1. **Time association (DEPEND_0)**
+   - Data variables must be associated with the selected time variable via `DEPEND_0` attribute
+   - Time variables must be associated with at least one selected data variable
+   - Variables without `DEPEND_0` are treated as compatible with any time variable
+   - Disabled tooltip explains which time variable to select
+
+2. **Unit compatibility**
+   - All selected data variables must share the same unit (for meaningful Y-axis)
+   - Variables with different units are disabled after the first selection
+   - Deselecting all variables unlocks unit selection again
 
 ### Chart Rendering
 
@@ -51,13 +59,17 @@ Time series visualization for selected variables. Opens as an auxiliary window f
 ### Color System
 
 - Each variable gets deterministic color based on name hash
-- Vector components get hue-shifted variants (X, Y: +30°, Z: +60°)
+- Vector components use adaptive LCH algorithm (see [variable-colors.md](variable-colors.md))
 - Colors persist across sessions via file xattr
+
+### Timestamp Display
+
+- Sidebar shows timestamp when hovering with time variable selected
+- Two-line format: date (YYYY-MM-DD) and time with milliseconds (HH:mm:ss.SSS)
+- Pause indicator (orange pause icon) shown when cursor is paused
 
 ### Cursor Synchronization
 
 - Cursor position shared with Table and Globe views
 - Clicking chart pauses cursor at that timestamp
 - Pause indicated by orange slider tint
-
-<!-- TODO: Understand primary workflows - anomaly detection? Comparing variables? Event correlation? -->

@@ -17,9 +17,17 @@ Each data variable gets a unique, visually consistent color for display in Chart
 - Overrides survive app restarts and file moves
 
 ### Vector Component Colors
-- 3-vec variables (X, Y, Z) get hue-shifted variants of the base color
-- X: base color, Y: +30° hue shift, Z: +60° hue shift
-- Shown on hover in the info popover with animated cascade reveal
+
+Uses adaptive LCH algorithm to ensure X, Y, Z are always visually distinguishable:
+
+- **Normal colors (mid-lightness, saturated)**: Shifts hue ±30° per step with ±10% chroma variation
+- **Low chroma (C<15, near gray)**: Adds +25 chroma per step to create actual color differences
+- **Dark colors (L<30)**: Lightens +28 and adds +15 chroma per step
+- **Light colors (L>70)**: Darkens -28 and adds +15 chroma per step
+
+This handles edge cases like white, black, or gray base colors where pure hue shifts would be invisible. Test coverage in `test_color_variants.swift` ensures minimum LCH distance between variants.
+
+Shown on hover in the info popover with animated cascade reveal.
 
 ### View-Specific Behavior
 - **Chart view**: Shows colors for selected variables in sidebar and on chart lines

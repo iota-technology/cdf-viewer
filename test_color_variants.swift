@@ -211,17 +211,64 @@ func printColorDetails(_ colors: [NSColor], label: String) {
     }
 }
 
+// MARK: - LCH Roundtrip Test
+
+func testLCHRoundtrip(_ color: NSColor, name: String) -> Bool {
+    let (l, c, h) = color.lchComponents
+    let reconstructed = NSColor.lch(lightness: l, chroma: c, hue: h)
+
+    guard let orig = color.usingColorSpace(.deviceRGB),
+          let recon = reconstructed.usingColorSpace(.deviceRGB) else {
+        return false
+    }
+
+    let rDiff = abs(orig.redComponent - recon.redComponent)
+    let gDiff = abs(orig.greenComponent - recon.greenComponent)
+    let bDiff = abs(orig.blueComponent - recon.blueComponent)
+    let maxDiff = max(rDiff, gDiff, bDiff)
+
+    // Allow small tolerance for floating point
+    return maxDiff < 0.02
+}
+
 // MARK: - Run Tests
 
 let minimumLCHDistanceSquared: Double = 400.0
 var failures: [(String, Double)] = []
+var roundtripFailures: [String] = []
 
 print("=" * 60)
-print("Color Variant Algorithm Test")
+print("Color Variant Algorithm Test Suite")
+print("=" * 60)
+
+// Test 1: LCH Roundtrip Accuracy
+print("\n--- LCH Roundtrip Tests ---")
+let roundtripColors: [(String, NSColor)] = [
+    ("White", NSColor.white),
+    ("Black", NSColor.black),
+    ("Gray", NSColor.gray),
+    ("Red", NSColor.red),
+    ("Green", NSColor.green),
+    ("Blue", NSColor.blue),
+    ("Cyan", NSColor.cyan),
+    ("Magenta", NSColor.magenta),
+    ("Yellow", NSColor.yellow),
+    ("Orange", NSColor.orange),
+]
+
+for (name, color) in roundtripColors {
+    if testLCHRoundtrip(color, name: name) {
+        print("  ✓ \(name)")
+    } else {
+        print("  ✗ \(name) - roundtrip error")
+        roundtripFailures.append(name)
+    }
+}
+
+// Test 2: Color Variant Distance
+print("\n--- Color Variant Distance Tests ---")
 print("Minimum required distance²: \(minimumLCHDistanceSquared)")
-print("=" * 60)
 
-// Test cases
 let testCases: [(String, NSColor)] = [
     ("Pure White", NSColor.white),
     ("Pure Black", NSColor.black),
@@ -248,14 +295,39 @@ for (name, color) in testCases {
     }
 }
 
+// Test 3: Five-color variants
+print("\n--- 5-Color Variant Tests ---")
+let fiveColorTests: [(String, NSColor)] = [
+    ("White (5)", NSColor.white),
+    ("Black (5)", NSColor.black),
+    ("Blue (5)", NSColor.blue),
+]
+
+for (name, color) in fiveColorTests {
+    let variants = generateColorVariants(from: color, count: 5)
+    let minDist = minimumPairwiseDistanceSquared(variants)
+    let status = minDist >= minimumLCHDistanceSquared ? "✓ PASS" : "✗ FAIL"
+    print("  \(name): min dist² = \(String(format: "%.1f", minDist)) \(status)")
+    if minDist < minimumLCHDistanceSquared {
+        failures.append((name, minDist))
+    }
+}
+
+// Summary
 print("\n" + "=" * 60)
-if failures.isEmpty {
+let totalFailures = failures.count + roundtripFailures.count
+if totalFailures == 0 {
     print("All tests PASSED!")
+    exit(0)
 } else {
-    print("FAILURES (\(failures.count)):")
+    print("FAILURES (\(totalFailures)):")
+    for name in roundtripFailures {
+        print("  - \(name): LCH roundtrip error")
+    }
     for (name, dist) in failures {
         print("  - \(name): distance² = \(String(format: "%.1f", dist)) (need \(minimumLCHDistanceSquared))")
     }
+    exit(1)
 }
 print("=" * 60)
 

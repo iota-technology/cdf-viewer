@@ -205,6 +205,8 @@ NavigationSplitView(...) {
 }
 ```
 
+**Color utilities not called from UI code**: When implementing color transformation functions (like `componentColors(for:)`), it's easy to write the utility but forget to call it from the actual UI code. Always verify new color utilities are wired up in `colorForSeries` or equivalent functions, not just written.
+
 **White navigation title on dark background (macOS)**: SwiftUI's `.toolbarColorScheme(.dark)` doesn't reliably make navigation titles white on macOS. Use a WindowAccessor to set the window's appearance directly:
 
 ```swift
