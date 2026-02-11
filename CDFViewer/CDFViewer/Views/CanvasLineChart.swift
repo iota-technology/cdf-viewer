@@ -23,7 +23,7 @@ struct CanvasLineChart: View {
     private let leftPadding: CGFloat = 70   // Space for Y-axis labels
     private let rightPadding: CGFloat = 20
     private let topPadding: CGFloat = 20
-    private let bottomPadding: CGFloat = 40 // Space for X-axis labels
+    private let bottomPadding: CGFloat = 52 // Space for two-line X-axis labels (time + date)
 
     var body: some View {
         GeometryReader { geometry in
@@ -191,19 +191,68 @@ struct CanvasLineChart: View {
         let labelColor = Color.secondary
         let xTicks = calculateXTicks(xRange: xRange, count: 6)
 
+        // Determine if we need seconds precision (when consecutive ticks share the same hour:minute)
+        let needsSeconds = xTicksNeedSeconds(xTicks)
+
+        // Track which date was last shown to only show date at transitions
+        var lastShownDateString: String? = nil
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd"
+
+        let timeFormatter = DateFormatter()
+        timeFormatter.dateFormat = needsSeconds ? "HH:mm:ss" : "HH:mm"
+
         for tick in xTicks {
             let xPos = dateToPixel(tick, in: plotRect, xRange: xRange)
+            let tickDateString = dateFormatter.string(from: tick)
 
-            let text = Text(formatXDate(tick))
+            // Draw time label (top line, closer to chart)
+            let timeText = Text(timeFormatter.string(from: tick))
                 .font(.system(size: 10))
                 .foregroundColor(labelColor)
 
             context.draw(
-                text,
-                at: CGPoint(x: xPos, y: plotRect.maxY + 15),
+                timeText,
+                at: CGPoint(x: xPos, y: plotRect.maxY + 6),
                 anchor: .top
             )
+
+            // Draw date label only when date changes (or first tick)
+            if lastShownDateString != tickDateString {
+                let dateText = Text(tickDateString)
+                    .font(.system(size: 9))
+                    .foregroundColor(labelColor.opacity(0.8))
+
+                context.draw(
+                    dateText,
+                    at: CGPoint(x: xPos, y: plotRect.maxY + 20),
+                    anchor: .top
+                )
+
+                lastShownDateString = tickDateString
+            }
         }
+    }
+
+    /// Determines if X-axis ticks need seconds precision
+    /// Returns true if any consecutive ticks share the same hour:minute
+    private func xTicksNeedSeconds(_ ticks: [Date]) -> Bool {
+        guard ticks.count >= 2 else { return false }
+
+        let calendar = Calendar.current
+        for i in 1..<ticks.count {
+            let prev = ticks[i - 1]
+            let curr = ticks[i]
+
+            let prevComponents = calendar.dateComponents([.hour, .minute], from: prev)
+            let currComponents = calendar.dateComponents([.hour, .minute], from: curr)
+
+            if prevComponents.hour == currComponents.hour &&
+               prevComponents.minute == currComponents.minute {
+                return true
+            }
+        }
+        return false
     }
 
     private func drawSeries(context: GraphicsContext, series: CanvasChartSeries, index: Int,
@@ -364,12 +413,6 @@ struct CanvasLineChart: View {
         } else {
             return String(format: "%.2e", value)
         }
-    }
-
-    private func formatXDate(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "MM/dd HH:mm"
-        return formatter.string(from: date)
     }
 
     private func calculateXTicks(xRange: ClosedRange<Date>, count: Int) -> [Date] {

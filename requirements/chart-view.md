@@ -16,10 +16,26 @@ Time series visualization for selected variables. Opens as an auxiliary window f
 - Data variables for Y-axis (multi-select)
 - Each selected variable gets its own colored line
 
+### Unit Constraints
+
+- All selected variables must share the same unit (for meaningful Y-axis)
+- Variables with different units are disabled in the sidebar
+- Disabled variables show tooltip explaining the constraint
+- Deselecting all variables unlocks unit selection again
+
 ### Chart Rendering
-- Uses Swift Charts for visualization
-- Each data series requires explicit `series:` parameter for proper separation
+
+- Uses Canvas for high-performance rendering with large datasets
+- Min-max downsampling preserves visual peaks/valleys at any zoom level
 - Cursor drawn as overlay Path (not RuleMark) to avoid performance issues
+
+### Adaptive Time Axis
+
+- Two-line layout: time (top), date (bottom)
+- Date only shown at leftmost tick where that date starts
+- Subsequent ticks on the same date show only time
+- Adaptive precision: seconds shown only when tick spacing is sub-minute
+- Determines precision by checking if consecutive ticks share same hour:minute
 
 ### Hover Interaction
 - Hovering shows cursor line and value readouts
