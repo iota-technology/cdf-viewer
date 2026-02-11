@@ -1,15 +1,35 @@
 import SwiftUI
 import SceneKit
 
+/// Helper to access and configure NSWindow from SwiftUI
+struct WindowAccessor: NSViewRepresentable {
+    var configure: (NSWindow) -> Void
+
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView()
+        DispatchQueue.main.async {
+            if let window = view.window {
+                configure(window)
+            }
+        }
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        DispatchQueue.main.async {
+            if let window = nsView.window {
+                configure(window)
+            }
+        }
+    }
+}
+
 struct GlobeView: View {
     @Bindable var viewModel: CDFViewModel
 
     // Selection state (matching Chart view pattern)
     @State private var selectedTimeVariable: CDFVariable?
     @State private var selectedPositionVariables: Set<String> = []  // Variable names
-
-    // Sidebar visibility (Photos-style toggle)
-    @State private var columnVisibility: NavigationSplitViewVisibility = .all
 
     // Globe data - supports multiple tracks
     @State private var tracks: [String: [(x: Double, y: Double, z: Double)]] = [:]  // varName -> positions
@@ -53,18 +73,49 @@ struct GlobeView: View {
         tracks.values.first?.count ?? 0
     }
 
+    // Sidebar visibility
+    @State private var columnVisibility: NavigationSplitViewVisibility = .all
+    private let sidebarWidth: CGFloat = 280  // Approximate sidebar width for scrubber offset
+
     var body: some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
-            NavigationSidebarContainer(sidebarBackground: .black) {
+            NavigationSidebarContainer {
                 sidebarView
             }
             .navigationSplitViewColumnWidth(min: 200, ideal: 280, max: 400)
         } detail: {
-            globeAreaView
+            // Interactive SceneView in detail area - receives mouse events
+            if let scene = scene {
+                SceneView(
+                    scene: scene,
+                    options: [.allowsCameraControl, .autoenablesDefaultLighting]
+                )
+                .background(Color.black)
+                .overlay(alignment: .bottom) {
+                    scrubberControls
+                }
+            } else {
+                Color.black
+            }
+        }
+        .background {
+            // Visual-only full-bleed background (same scene, syncs camera via shared SCNScene)
+            sceneOnlyView
+                .ignoresSafeArea()
         }
         .toolbarBackground(.hidden, for: .windowToolbar)
         .sidebarToggleToolbar()
         .toolbar(removing: .sidebarToggle)
+        .navigationTitle("3D Globe")
+        .focusable()
+        .background {
+            // Force dark titlebar appearance for white title text
+            WindowAccessor { window in
+                window.titlebarAppearsTransparent = true
+                // Force titlebar to use dark appearance (white text)
+                window.appearance = NSAppearance(named: .darkAqua)
+            }
+        }
         .onAppear {
             setupInitialSelection()
         }
@@ -197,89 +248,85 @@ struct GlobeView: View {
         }
     }
 
-    // MARK: - Globe Area
+    // MARK: - Scene View (Full-bleed background)
 
-    private var globeAreaView: some View {
-        VStack {
-            if let error = errorMessage {
-                ContentUnavailableView(
-                    "Error",
-                    systemImage: "exclamationmark.triangle",
-                    description: Text(error)
-                )
-            } else if let scene = scene {
-                SceneView(
-                    scene: scene,
-                    options: [.allowsCameraControl, .autoenablesDefaultLighting]
-                )
-                .background(Color.black)
-                .overlay(alignment: .bottom) {
-                    if !tracks.isEmpty {
-                        // QuickTime-style scrubber overlay
-                        VStack(spacing: 8) {
-                            // Timestamp display
-                            if let currentDate = currentTimestamp {
-                                Text(currentDate, format: .dateTime.year().month().day().hour().minute())
-                                    .font(.system(size: 18, weight: .medium).monospacedDigit())
-                                    .foregroundStyle(.white)
-                                    .shadow(color: .black, radius: 2)
-                            }
+    /// Visual-only SceneView for full-bleed background effect
+    /// Shares the same SCNScene as the interactive detail view, so camera changes sync
+    @ViewBuilder
+    private var sceneOnlyView: some View {
+        if let scene = scene {
+            SceneView(
+                scene: scene,
+                options: [.autoenablesDefaultLighting]  // No camera control - just visual
+            )
+            .background(Color.black)
+            .allowsHitTesting(false)
+        } else {
+            Color.black
+        }
+    }
 
-                            // Scrubber controls
-                            HStack(spacing: 12) {
-                                // Play/Pause button
-                                Button {
-                                    toggleAnimation()
-                                } label: {
-                                    Image(systemName: isAnimating ? "pause.fill" : "play.fill")
-                                        .font(.title2)
-                                }
-                                .buttonStyle(.plain)
-                                .foregroundStyle(.white)
+    // MARK: - Scrubber Controls
 
-                                // Scrubber slider - bound to shared cursor progress
-                                Slider(value: $viewModel.cursorProgress, in: 0...1)
-                                    .tint(viewModel.isCursorPaused ? .orange : .white)
-                                    .frame(minWidth: 200)
-
-                                // Speed picker
-                                Menu {
-                                    ForEach(speedOptions, id: \.value) { option in
-                                        Button {
-                                            speedMultiplier = option.value
-                                        } label: {
-                                            HStack {
-                                                Text(option.label)
-                                                if speedMultiplier == option.value {
-                                                    Image(systemName: "checkmark")
-                                                }
-                                            }
-                                        }
-                                    }
-                                } label: {
-                                    Text(speedOptions.first { $0.value == speedMultiplier }?.label ?? "\(Int(speedMultiplier))×")
-                                        .font(.system(.body, design: .monospaced))
-                                        .foregroundStyle(.white)
-                                        .frame(width: 60)
-                                }
-                                .menuStyle(.borderlessButton)
-                            }
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 10)
-                            .background(.black.opacity(0.6))
-                            .clipShape(RoundedRectangle(cornerRadius: 8))
-                        }
-                        .padding(.bottom, 20)
-                        .padding(.horizontal, 20)
-                    }
+    /// QuickTime-style scrubber overlay at the bottom
+    @ViewBuilder
+    private var scrubberControls: some View {
+        if !tracks.isEmpty {
+            VStack(spacing: 8) {
+                // Timestamp display
+                if let currentDate = currentTimestamp {
+                    Text(currentDate, format: .dateTime.year().month().day().hour().minute())
+                        .font(.system(size: 18, weight: .medium).monospacedDigit())
+                        .foregroundStyle(.white)
+                        .shadow(color: .black, radius: 2)
                 }
-            } else {
-                ContentUnavailableView(
-                    "No Track Loaded",
-                    systemImage: "globe",
-                    description: Text("Select a position variable to load the track")
-                )
+
+                // Scrubber controls
+                HStack(spacing: 12) {
+                    // Play/Pause button
+                    Button {
+                        toggleAnimation()
+                    } label: {
+                        Image(systemName: isAnimating ? "pause.fill" : "play.fill")
+                            .font(.title2)
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.white)
+
+                    // Scrubber slider - bound to shared cursor progress
+                    Slider(value: $viewModel.cursorProgress, in: 0...1)
+                        .tint(viewModel.isCursorPaused ? .orange : .white)
+                        .frame(minWidth: 200)
+
+                    // Speed picker
+                    Menu {
+                        ForEach(speedOptions, id: \.value) { option in
+                            Button {
+                                speedMultiplier = option.value
+                            } label: {
+                                HStack {
+                                    Text(option.label)
+                                    if speedMultiplier == option.value {
+                                        Image(systemName: "checkmark")
+                                    }
+                                }
+                            }
+                        }
+                    } label: {
+                        Text(speedOptions.first { $0.value == speedMultiplier }?.label ?? "\(Int(speedMultiplier))×")
+                            .font(.system(.body, design: .monospaced))
+                            .foregroundStyle(.white)
+                            .frame(width: 60)
+                    }
+                    .menuStyle(.borderlessButton)
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .background(.black.opacity(0.6))
+                .clipShape(RoundedRectangle(cornerRadius: 8))
             }
+            .padding(.bottom, 20)
+            .padding(.horizontal, 20)
         }
     }
 
@@ -306,7 +353,8 @@ struct GlobeView: View {
         earthNode.name = "earth"
         newScene.rootNode.addChildNode(earthNode)
 
-        // Camera
+        // Camera - standard position, globe centered at origin
+        // Note: Globe centering in visible area is handled by the SceneView being in the detail area
         let cameraNode = SCNNode()
         cameraNode.camera = SCNCamera()
         cameraNode.camera?.zFar = 1000
