@@ -5,6 +5,22 @@ All notable changes to CDF Viewer will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.1] - 2025-02-11
+
+### Performance
+
+- Binary search for visible point range in charts (O(log n) vs O(n))
+- Min-max downsampling preserves peaks/valleys while reducing rendered points
+- Y-range calculation only iterates visible points
+- Cache column type lookups in table for O(1) access
+- Reuse DateFormatter instead of creating per-row
+
+### Added
+
+- Units display in sidebar next to data type (when UNITS attribute exists)
+- Y-axis label on charts showing units (when all selected variables share same units)
+- Integer types display without decimal points in table
+
 ## [0.7.0] - 2025-02-11
 
 ### Changed
