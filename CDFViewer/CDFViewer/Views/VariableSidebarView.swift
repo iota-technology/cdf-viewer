@@ -430,7 +430,7 @@ struct VariableSidebarView<TrailingContent: View>: View {
         }
     }
 
-    /// Format variable type info for display (e.g., "DOUBLE [86400]" or "DOUBLE [86400] m")
+    /// Format variable type info for display (e.g., "DOUBLE [86400]" or "DOUBLE [86400] [m]")
     private func variableTypeInfo(_ variable: CDFVariable, showVectorSize: Bool = false) -> String {
         var info: String
         if showVectorSize {
@@ -439,9 +439,9 @@ struct VariableSidebarView<TrailingContent: View>: View {
             info = "\(variable.dataType.displayName) [\(variable.recordCount)]"
         }
 
-        // Append units if available
+        // Append units if available (in parentheses for visual consistency)
         if let units = variable.units {
-            info += " \(units)"
+            info += " (\(units))"
         }
 
         return info

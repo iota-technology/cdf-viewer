@@ -217,9 +217,10 @@ final class CDFViewModel {
                 for (varName, components) in variableComponents.sorted(by: { $0.key < $1.key }) {
                     let variable = file.variables.first(where: { $0.name == varName })
                     let isInteger = variable?.dataType.isIntegerType ?? false
+                    let unitsSuffix = variable?.units.map { " (\($0))" } ?? ""
                     for component in components.sorted() {
                         let key = "\(varName).\(component)"
-                        columns.append(DataColumn(id: key, name: "\(varName).\(component)", key: key, isIntegerType: isInteger))
+                        columns.append(DataColumn(id: key, name: "\(varName).\(component)\(unitsSuffix)", key: key, isIntegerType: isInteger))
                     }
                 }
 
@@ -227,7 +228,8 @@ final class CDFViewModel {
                 for varName in scalarVariables.sorted() {
                     let variable = file.variables.first(where: { $0.name == varName })
                     let isInteger = variable?.dataType.isIntegerType ?? false
-                    columns.append(DataColumn(id: varName, name: varName, key: varName, isIntegerType: isInteger))
+                    let unitsSuffix = variable?.units.map { " (\($0))" } ?? ""
+                    columns.append(DataColumn(id: varName, name: "\(varName)\(unitsSuffix)", key: varName, isIntegerType: isInteger))
                 }
 
                 // Read data for each variable/component into contiguous arrays
