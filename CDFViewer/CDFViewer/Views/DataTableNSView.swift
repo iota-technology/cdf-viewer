@@ -110,17 +110,21 @@ struct DataTableNSView: NSViewRepresentable {
             }
 
             // Get value based on column
+            // Note: Must set ALL cell properties in every branch due to cell reuse
             if columnId == "time" {
+                cellView?.alignment = .left
                 if let timestamp = viewModel.timestamp(at: row) {
                     cellView?.stringValue = formatTimestamp(timestamp)
-                    cellView?.alignment = .left
+                    cellView?.textColor = .labelColor
                 } else {
                     cellView?.stringValue = "-"
+                    cellView?.textColor = .tertiaryLabelColor
                 }
             } else {
+                cellView?.alignment = .right
                 if let value = viewModel.value(column: columnId, at: row) {
                     cellView?.stringValue = formatValue(value)
-                    cellView?.alignment = .right
+                    cellView?.textColor = .labelColor
                 } else {
                     cellView?.stringValue = "-"
                     cellView?.textColor = .tertiaryLabelColor
