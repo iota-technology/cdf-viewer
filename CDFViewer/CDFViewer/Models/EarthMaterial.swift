@@ -3,30 +3,60 @@ import AppKit
 
 /// Manages the Earth's appearance with seasonal textures, day/night cycle, and city lights
 class EarthMaterial {
-    // Monthly Blue Marble textures (0-indexed internally)
-    private var monthlyTextures: [NSImage] = []
+    // Monthly Blue Marble textures (0-indexed internally, nil = not yet loaded)
+    private var monthlyTextures: [NSImage?] = Array(repeating: nil, count: 12)
     private var nightTexture: NSImage?
 
     // Current state
     private(set) var currentMonth: Int = 1  // 1-12
 
+    // Cache for blended texture to avoid re-blending
+    private var cachedBlendedTexture: NSImage?
+    private var cachedBlendKey: String = ""
+
+    // Track if background loading is complete
+    private var isFullyLoaded = false
+
     init() {
-        loadTextures()
+        // Don't load anything in init - textures loaded lazily on first use
     }
 
-    private func loadTextures() {
-        // Load monthly textures (01-12)
-        for month in 1...12 {
-            let filename = String(format: "blue_marble_%02d", month)
-            if let url = Bundle.main.url(forResource: filename, withExtension: "jpg"),
-               let image = NSImage(contentsOf: url) {
-                monthlyTextures.append(image)
-            } else {
-                monthlyTextures.append(createFallbackTexture())
-            }
+    /// Loads a specific month's texture (lazy loading)
+    private func loadTexture(for month: Int) -> NSImage {
+        let idx = month - 1
+        if let cached = monthlyTextures[idx] {
+            return cached
         }
 
-        // Load night texture
+        let filename = String(format: "blue_marble_%02d", month)
+        if let url = Bundle.main.url(forResource: filename, withExtension: "jpg"),
+           let image = NSImage(contentsOf: url) {
+            monthlyTextures[idx] = image
+            return image
+        } else {
+            let fallback = createFallbackTexture()
+            monthlyTextures[idx] = fallback
+            return fallback
+        }
+    }
+
+    /// Loads all remaining textures in background for smooth blending later
+    func preloadRemainingTextures() {
+        guard !isFullyLoaded else { return }
+
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+            guard let self = self else { return }
+            for month in 1...12 {
+                _ = self.loadTexture(for: month)
+            }
+            self.isFullyLoaded = true
+        }
+    }
+
+    /// Ensures night texture is loaded
+    private func ensureNightTextureLoaded() {
+        guard nightTexture == nil else { return }
+
         if let url = Bundle.main.url(forResource: "black_marble", withExtension: "jpg"),
            let image = NSImage(contentsOf: url) {
             nightTexture = image
@@ -53,25 +83,42 @@ class EarthMaterial {
 
         currentMonth = month
 
-        let currentIdx = month - 1  // 0-indexed
-        let nextIdx = month % 12    // Wrap December -> January
-
-        guard monthlyTextures.count == 12 else {
-            return monthlyTextures.first ?? createFallbackTexture()
-        }
-
         // Calculate blend factor: day 1 = 0% next, last day = ~97% next
         let blendFactor = CGFloat(day - 1) / CGFloat(daysInMonth)
 
-        // Skip blending if near month boundaries (for performance)
-        if blendFactor < 0.05 {
-            return monthlyTextures[currentIdx]
-        } else if blendFactor > 0.95 {
-            return monthlyTextures[nextIdx]
+        // Create cache key based on month and quantized blend factor (5% steps)
+        let quantizedBlend = Int(blendFactor * 20) // 0-20 steps
+        let cacheKey = "\(month)-\(quantizedBlend)"
+
+        // Return cached texture if available
+        if cacheKey == cachedBlendKey, let cached = cachedBlendedTexture {
+            return cached
         }
 
-        // Blend textures
-        return blendImages(monthlyTextures[currentIdx], monthlyTextures[nextIdx], factor: blendFactor)
+        let nextMonth = (month % 12) + 1
+
+        // Load current month's texture (lazy)
+        let currentTexture = loadTexture(for: month)
+
+        // Skip blending if near month boundaries (for performance)
+        // Also skip if next month's texture isn't loaded yet
+        if blendFactor < 0.05 || monthlyTextures[nextMonth - 1] == nil {
+            cachedBlendedTexture = currentTexture
+            cachedBlendKey = cacheKey
+            return currentTexture
+        } else if blendFactor > 0.95 {
+            let nextTexture = loadTexture(for: nextMonth)
+            cachedBlendedTexture = nextTexture
+            cachedBlendKey = cacheKey
+            return nextTexture
+        }
+
+        // Load next month's texture and blend
+        let nextTexture = loadTexture(for: nextMonth)
+        let blended = blendImages(currentTexture, nextTexture, factor: blendFactor)
+        cachedBlendedTexture = blended
+        cachedBlendKey = cacheKey
+        return blended
     }
 
     /// Returns the night texture (Black Marble)
@@ -160,19 +207,23 @@ extension EarthMaterial {
     func createMaterial(for date: Date) -> SCNMaterial {
         let material = SCNMaterial()
 
-        // Set diffuse (day texture, blended for current month)
+        // Set diffuse (day texture, blended for current month - loads lazily)
         let dayTexture = createBlendedDayTexture(for: date)
         material.diffuse.contents = dayTexture
         material.diffuse.wrapS = .repeat
         material.diffuse.wrapT = .clamp
 
-        // Set emission (night texture - city lights)
+        // Ensure night texture is loaded, then set emission
+        ensureNightTextureLoaded()
         if let night = nightTexture {
             material.emission.contents = night
             material.emission.wrapS = .repeat
             material.emission.wrapT = .clamp
             material.emission.intensity = 2.5
         }
+
+        // Start loading remaining textures in background for smooth blending later
+        preloadRemainingTextures()
 
         // Fragment shader: fade city lights based on lighting contribution
         // This runs AFTER lighting, so _lightingContribution is available

@@ -40,6 +40,7 @@ struct GlobeView: View {
     @State private var scene: SCNScene?
     @State private var trackNodes: [String: SCNNode] = [:]  // varName -> track node
     @State private var trackVerticesCache: [String: [SCNVector3]] = [:]  // varName -> vertices
+    @State private var gapIndices: Set<Int> = []  // Indices where there's a gap in data
     @State private var speedMultiplier: Double = 600.0
     @State private var lastExternalProgress: Double = 1.0  // Track external changes
 
@@ -400,6 +401,9 @@ struct GlobeView: View {
         trackNodes = [:]
         trackVerticesCache = [:]
 
+        // Detect gaps in timestamp data
+        gapIndices = detectGapIndices()
+
         // Create geometry for each track
         let sortedVars = selectedPositionVariables.sorted()
         for (index, varName) in sortedVars.enumerated() {
@@ -409,9 +413,9 @@ struct GlobeView: View {
             let vertices = positions.map { ecefToSceneKit($0.x, $0.y, $0.z) }
             trackVerticesCache[varName] = vertices
 
-            // Create track node
+            // Create track node (with gaps)
             let color = nsColorForTrack(varName: varName, index: index)
-            let node = createTrackNode(vertices: vertices, color: color, name: "track_\(varName)")
+            let node = createTrackNode(vertices: vertices, color: color, name: "track_\(varName)", gapIndices: gapIndices)
             scene.rootNode.addChildNode(node)
             trackNodes[varName] = node
 
@@ -423,18 +427,53 @@ struct GlobeView: View {
         updateTrackProgress()
     }
 
-    private func createTrackNode(vertices: [SCNVector3], color: NSColor, name: String) -> SCNNode {
+    /// Detects indices where there's a gap in the timestamp data
+    /// A gap is defined as a time step > 3x the median time step
+    private func detectGapIndices() -> Set<Int> {
+        guard timestamps.count > 2 else { return [] }
+
+        // Calculate time deltas between consecutive points
+        var deltas: [TimeInterval] = []
+        for i in 1..<timestamps.count {
+            deltas.append(timestamps[i].timeIntervalSince(timestamps[i - 1]))
+        }
+
+        // Find median delta
+        let sortedDeltas = deltas.sorted()
+        let medianDelta = sortedDeltas[sortedDeltas.count / 2]
+
+        // Gap threshold: 3x median (to account for some variation)
+        let gapThreshold = medianDelta * 3
+
+        // Find indices where a gap starts (don't draw line from i to i+1)
+        var gapIndices: Set<Int> = []
+        for (i, delta) in deltas.enumerated() {
+            if delta > gapThreshold {
+                gapIndices.insert(i)
+            }
+        }
+
+        return gapIndices
+    }
+
+    private func createTrackNode(vertices: [SCNVector3], color: NSColor, name: String, gapIndices: Set<Int> = []) -> SCNNode {
         let vertexSource = SCNGeometrySource(vertices: vertices)
         var indices: [Int32] = []
+
+        // Create line segments, skipping gaps
         for i in 0..<(vertices.count - 1) {
-            indices.append(Int32(i))
-            indices.append(Int32(i + 1))
+            if !gapIndices.contains(i) {
+                indices.append(Int32(i))
+                indices.append(Int32(i + 1))
+            }
         }
+
+        let primitiveCount = indices.count / 2
         let indexData = Data(bytes: indices, count: indices.count * MemoryLayout<Int32>.size)
         let element = SCNGeometryElement(
             data: indexData,
             primitiveType: .line,
-            primitiveCount: vertices.count - 1,
+            primitiveCount: primitiveCount,
             bytesPerIndex: MemoryLayout<Int32>.size
         )
 
@@ -500,23 +539,27 @@ struct GlobeView: View {
             guard vertices.count > 1,
                   let trackNode = trackNodes[varName] else { continue }
 
-            // Calculate how many segments to show
+            // Calculate how many segments to show based on progress
             let visibleSegments = max(1, Int(Double(vertices.count - 1) * viewModel.cursorProgress))
 
-            // Recreate geometry with visible segments only
+            // Recreate geometry with visible segments only, skipping gaps
             var indices: [Int32] = []
             indices.reserveCapacity(visibleSegments * 2)
             for i in 0..<visibleSegments {
-                indices.append(Int32(i))
-                indices.append(Int32(i + 1))
+                // Skip line segments that cross a gap
+                if !gapIndices.contains(i) {
+                    indices.append(Int32(i))
+                    indices.append(Int32(i + 1))
+                }
             }
 
+            let primitiveCount = indices.count / 2
             let vertexSource = SCNGeometrySource(vertices: vertices)
             let indexData = Data(bytes: indices, count: indices.count * MemoryLayout<Int32>.size)
             let element = SCNGeometryElement(
                 data: indexData,
                 primitiveType: .line,
-                primitiveCount: visibleSegments,
+                primitiveCount: primitiveCount,
                 bytesPerIndex: MemoryLayout<Int32>.size
             )
 
@@ -556,6 +599,7 @@ struct GlobeView: View {
         // Clear caches
         trackNodes = [:]
         trackVerticesCache = [:]
+        gapIndices = []
     }
 
     /// Updates sun light position and Earth material based on the current timestamp
