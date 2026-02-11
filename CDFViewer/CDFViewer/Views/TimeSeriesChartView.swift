@@ -154,6 +154,7 @@ struct TimeSeriesChartView: View {
                 fullXRange: fullDateRange,
                 cursorDate: activeDate,
                 isCursorPaused: viewModel.isCursorPaused,
+                isAnimating: viewModel.isAnimating,
                 colorForSeries: colorForSeries,
                 yAxisLabel: yAxisUnits,
                 onZoom: { scale in applyZoom(scale: scale) },
@@ -166,7 +167,18 @@ struct TimeSeriesChartView: View {
                         viewModel.clearCursor()
                     }
                 },
-                onTap: { viewModel.toggleCursorPause() }
+                onTap: { clickedDate in
+                    // If animation is playing, stop it and jump to clicked position
+                    if viewModel.isAnimating {
+                        viewModel.isAnimating = false
+                        if let date = clickedDate {
+                            viewModel.cursorDate = date
+                        }
+                        viewModel.isCursorPaused = true
+                    } else {
+                        viewModel.toggleCursorPause()
+                    }
+                }
             )
 
             // Reset button (shown when zoomed)

@@ -36,7 +36,6 @@ struct GlobeView: View {
     @State private var timestamps: [Date] = []
     @State private var isLoading = false
     @State private var errorMessage: String?
-    @State private var isAnimating = false
     @State private var scene: SCNScene?
     @State private var trackNodes: [String: SCNNode] = [:]  // varName -> track node
     @State private var trackVerticesCache: [String: [SCNVector3]] = [:]  // varName -> vertices
@@ -131,9 +130,9 @@ struct GlobeView: View {
             updateTrackProgress()
 
             // If progress changed externally (not from our animation), stop animating
-            if isAnimating && abs(newValue - lastExternalProgress) > 0.001 {
+            if viewModel.isAnimating && abs(newValue - lastExternalProgress) > 0.001 {
                 // External change detected (from table/chart hover or slider drag)
-                isAnimating = false
+                viewModel.isAnimating = false
             }
             lastExternalProgress = newValue
         }
@@ -144,8 +143,8 @@ struct GlobeView: View {
         }
         .onChange(of: viewModel.isCursorPaused) { _, isPaused in
             // If cursor was paused externally (from table/chart click), stop our animation
-            if isPaused && isAnimating {
-                isAnimating = false
+            if isPaused && viewModel.isAnimating {
+                viewModel.isAnimating = false
             }
         }
         .onChange(of: viewModel.variableOverrides) { _, _ in
@@ -189,7 +188,7 @@ struct GlobeView: View {
                         Text(date, format: .dateTime.month().day().hour().minute().second())
                             .font(.system(size: 11, design: .monospaced))
                             .foregroundStyle(.secondary)
-                        if viewModel.isCursorPaused && !isAnimating {
+                        if viewModel.isCursorPaused && !viewModel.isAnimating {
                             Image(systemName: "pause.fill")
                                 .font(.system(size: 9))
                                 .foregroundStyle(.orange)
@@ -294,7 +293,7 @@ struct GlobeView: View {
                     Button {
                         toggleAnimation()
                     } label: {
-                        Image(systemName: isAnimating ? "pause.fill" : "play.fill")
+                        Image(systemName: viewModel.isAnimating ? "pause.fill" : "play.fill")
                             .font(.title2)
                     }
                     .buttonStyle(.plain)
@@ -736,9 +735,9 @@ struct GlobeView: View {
     // MARK: - Animation
 
     private func toggleAnimation() {
-        isAnimating.toggle()
+        viewModel.isAnimating.toggle()
 
-        if isAnimating {
+        if viewModel.isAnimating {
             // If at the end, restart from beginning
             if viewModel.cursorProgress >= 1.0 {
                 viewModel.cursorProgress = 0
@@ -764,12 +763,12 @@ struct GlobeView: View {
     }
 
     private func startAnimation() {
-        guard isAnimating else { return }
+        guard viewModel.isAnimating else { return }
 
         let frameInterval: UInt64 = 16_000_000  // ~60fps in nanoseconds
 
         Task { @MainActor in
-            while isAnimating && viewModel.cursorProgress < 1.0 {
+            while viewModel.isAnimating && viewModel.cursorProgress < 1.0 {
                 try? await Task.sleep(nanoseconds: frameInterval)
                 // Recalculate each frame in case speed changed during animation
                 // At speedMultiplier×, animation completes in (trackDuration / speedMultiplier) seconds
@@ -780,7 +779,7 @@ struct GlobeView: View {
                 lastExternalProgress = newProgress  // Track our own updates
             }
             if viewModel.cursorProgress >= 1.0 {
-                isAnimating = false
+                viewModel.isAnimating = false
                 viewModel.isCursorPaused = true
             }
         }

@@ -72,6 +72,10 @@ final class CDFViewModel {
     /// Whether the cursor is paused (locked to current position)
     var isCursorPaused: Bool = false
 
+    /// Whether globe animation is currently playing (set by GlobeView)
+    /// When true, chart hover is disabled to prevent accidental animation stops
+    var isAnimating: Bool = false
+
     /// Current cursor as progress (0-1), for globe animation
     var cursorProgress: Double {
         get {

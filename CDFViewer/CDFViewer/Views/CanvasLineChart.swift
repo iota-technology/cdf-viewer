@@ -7,6 +7,7 @@ struct CanvasLineChart: View {
     let fullXRange: ClosedRange<Date>?
     let cursorDate: Date?
     let isCursorPaused: Bool
+    let isAnimating: Bool  // When true, hover is disabled (only click works)
     let colorForSeries: (String, Int) -> Color
 
     /// Optional Y-axis label (e.g., units like "meters" or "m/s")
@@ -16,7 +17,7 @@ struct CanvasLineChart: View {
     var onZoom: ((CGFloat) -> Void)?
     var onPan: ((CGFloat) -> Void)?
     var onHover: ((Date?) -> Void)?
-    var onTap: (() -> Void)?
+    var onTap: ((Date?) -> Void)?  // Date where click occurred (nil if outside plot area)
 
     // Layout constants
     private let leftPadding: CGFloat = 70   // Space for Y-axis labels
@@ -43,6 +44,7 @@ struct CanvasLineChart: View {
                 CanvasInteractionView(
                     plotRect: plotRect,
                     xRange: currentXRange,
+                    isAnimating: isAnimating,
                     onZoom: onZoom,
                     onPan: onPan,
                     onHover: { date in onHover?(date) },
@@ -435,11 +437,12 @@ struct CanvasChartPoint {
 struct CanvasInteractionView: NSViewRepresentable {
     let plotRect: CGRect
     let xRange: ClosedRange<Date>
+    let isAnimating: Bool  // When true, hover is disabled
     var onZoom: ((CGFloat) -> Void)?
     var onPan: ((CGFloat) -> Void)?
     var onHover: ((Date) -> Void)?
     var onHoverEnd: (() -> Void)?
-    var onTap: (() -> Void)?
+    var onTap: ((Date?) -> Void)?  // Date where click occurred
 
     func makeNSView(context: Context) -> CanvasInteractionNSView {
         let view = CanvasInteractionNSView()
@@ -450,6 +453,7 @@ struct CanvasInteractionView: NSViewRepresentable {
     func updateNSView(_ nsView: CanvasInteractionNSView, context: Context) {
         nsView.plotRect = plotRect
         nsView.xRange = xRange
+        nsView.isAnimating = isAnimating
         updateCallbacks(nsView)
     }
 
@@ -465,11 +469,12 @@ struct CanvasInteractionView: NSViewRepresentable {
 class CanvasInteractionNSView: NSView {
     var plotRect: CGRect = .zero
     var xRange: ClosedRange<Date> = Date.distantPast...Date.distantFuture
+    var isAnimating: Bool = false  // When true, hover is disabled
     var onZoom: ((CGFloat) -> Void)?
     var onPan: ((CGFloat) -> Void)?
     var onHover: ((Date) -> Void)?
     var onHoverEnd: (() -> Void)?
-    var onTap: (() -> Void)?
+    var onTap: ((Date?) -> Void)?  // Date where click occurred
 
     private var trackingArea: NSTrackingArea?
 
@@ -509,6 +514,9 @@ class CanvasInteractionNSView: NSView {
     }
 
     override func mouseMoved(with event: NSEvent) {
+        // Ignore hover when animation is playing (user must click to stop animation)
+        guard !isAnimating else { return }
+
         let location = convert(event.locationInWindow, from: nil)
         // Convert to flipped coordinates (NSView is not flipped by default)
         let flippedY = bounds.height - location.y
@@ -533,7 +541,21 @@ class CanvasInteractionNSView: NSView {
     override func mouseDown(with event: NSEvent) {
         window?.makeFirstResponder(self)
         if event.clickCount == 1 {
-            onTap?()
+            let location = convert(event.locationInWindow, from: nil)
+            let flippedY = bounds.height - location.y
+
+            // Check if within plot area and compute date
+            if location.x >= plotRect.minX && location.x <= plotRect.maxX &&
+               flippedY >= plotRect.minY && flippedY <= plotRect.maxY {
+                let fraction = (location.x - plotRect.minX) / plotRect.width
+                let xMin = xRange.lowerBound.timeIntervalSince1970
+                let xMax = xRange.upperBound.timeIntervalSince1970
+                let timestamp = xMin + Double(fraction) * (xMax - xMin)
+                let date = Date(timeIntervalSince1970: timestamp)
+                onTap?(date)
+            } else {
+                onTap?(nil)
+            }
         }
     }
 }
