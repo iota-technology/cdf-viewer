@@ -120,6 +120,7 @@ Chart {
 ```
 
 **Xcode project file structure**: When adding new Swift files to an Xcode project, you need to add entries in FOUR places in `project.pbxproj`:
+
 1. `PBXBuildFile` section - references the file for compilation
 2. `PBXFileReference` section - defines the file itself
 3. `PBXGroup` section - adds file to the appropriate folder/group in the navigator
@@ -184,6 +185,51 @@ HStack {
 ```swift
 .onChange(of: viewModel.variableOverrides) { _, _ in
     updateNodeColors()  // Manually update SCNMaterial.diffuse.contents
+}
+```
+
+**Full-bleed SceneView with NavigationSplitView**: To have a SceneView extend behind the sidebar (full-bleed effect) while still receiving mouse events for camera control, use a dual SceneView approach. Both share the same `SCNScene` object so camera changes sync:
+
+```swift
+NavigationSplitView(...) {
+    sidebar
+} detail: {
+    // Interactive SceneView - receives mouse events
+    SceneView(scene: scene, options: [.allowsCameraControl, .autoenablesDefaultLighting])
+}
+.background {
+    // Visual-only SceneView for full-bleed effect
+    SceneView(scene: scene, options: [.autoenablesDefaultLighting])  // No camera control
+        .ignoresSafeArea()
+        .allowsHitTesting(false)
+}
+```
+
+**White navigation title on dark background (macOS)**: SwiftUI's `.toolbarColorScheme(.dark)` doesn't reliably make navigation titles white on macOS. Use a WindowAccessor to set the window's appearance directly:
+
+```swift
+struct WindowAccessor: NSViewRepresentable {
+    var configure: (NSWindow) -> Void
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView()
+        DispatchQueue.main.async {
+            if let window = view.window { configure(window) }
+        }
+        return view
+    }
+    func updateNSView(_ nsView: NSView, context: Context) {
+        DispatchQueue.main.async {
+            if let window = nsView.window { configure(window) }
+        }
+    }
+}
+
+// Usage:
+.background {
+    WindowAccessor { window in
+        window.titlebarAppearsTransparent = true
+        window.appearance = NSAppearance(named: .darkAqua)
+    }
 }
 ```
 

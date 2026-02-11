@@ -37,3 +37,11 @@ Visualize satellite orbital position data on a 3D Earth globe with time-synchron
 - Changing color in info popover immediately updates track color
 - SceneKit materials updated via onChange observer
 - Both track line and marker sphere update together
+
+### Full-Bleed Visual Design
+- Scene extends under sidebar for immersive space visualization
+- Dark background with Earth requires white navigation title
+- Window titlebar transparent to blend with scene
+- Sidebar follows system light/dark mode appearance
+- Implementation uses dual SceneView (interactive in detail, visual-only as background)
+- Camera controls (rotate, zoom, pan) work only in detail area (not under sidebar)
