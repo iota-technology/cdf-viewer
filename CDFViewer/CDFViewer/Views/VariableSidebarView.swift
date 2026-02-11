@@ -130,7 +130,7 @@ struct VariableSidebarView<TrailingContent: View>: View {
                         .foregroundStyle(disabled ? .secondary : .primary)
 
                     if showDataTypeInfo {
-                        Text("\(variable.dataType.displayName) [\(variable.recordCount)]")
+                        Text(variableTypeInfo(variable))
                             .font(.system(size: 10))
                             .foregroundStyle(.tertiary)
                     }
@@ -226,11 +226,11 @@ struct VariableSidebarView<TrailingContent: View>: View {
                         if showDataTypeInfo {
                             // Show vector size when not expanding (e.g., "DOUBLE[3]")
                             if variable.isVector && !expandVectors {
-                                Text("\(variable.dataType.displayName)[\(variable.displayColumnsPerRow)]")
+                                Text(variableTypeInfo(variable, showVectorSize: true))
                                     .font(.system(size: 10))
                                     .foregroundStyle(.tertiary)
                             } else {
-                                Text("\(variable.dataType.displayName) [\(variable.recordCount)]")
+                                Text(variableTypeInfo(variable))
                                     .font(.system(size: 10))
                                     .foregroundStyle(.tertiary)
                             }
@@ -428,6 +428,23 @@ struct VariableSidebarView<TrailingContent: View>: View {
         } else {
             return String(format: "%.2f", value)
         }
+    }
+
+    /// Format variable type info for display (e.g., "DOUBLE [86400]" or "DOUBLE [86400] m")
+    private func variableTypeInfo(_ variable: CDFVariable, showVectorSize: Bool = false) -> String {
+        var info: String
+        if showVectorSize {
+            info = "\(variable.dataType.displayName)[\(variable.displayColumnsPerRow)]"
+        } else {
+            info = "\(variable.dataType.displayName) [\(variable.recordCount)]"
+        }
+
+        // Append units if available
+        if let units = variable.units {
+            info += " \(units)"
+        }
+
+        return info
     }
 }
 

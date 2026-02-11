@@ -83,6 +83,16 @@ enum CDFDataType: Int32 {
         default: return false
         }
     }
+
+    /// Whether this is an integer type (for display formatting)
+    var isIntegerType: Bool {
+        switch self {
+        case .int1, .int2, .int4, .int8, .uint1, .uint2, .uint4:
+            return true
+        default:
+            return false
+        }
+    }
 }
 
 /// Wrapper for CDF values that can hold any data type

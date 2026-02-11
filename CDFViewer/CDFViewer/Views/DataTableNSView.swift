@@ -123,7 +123,10 @@ struct DataTableNSView: NSViewRepresentable {
             } else {
                 cellView?.alignment = .right
                 if let value = viewModel.value(column: columnId, at: row) {
-                    cellView?.stringValue = formatValue(value)
+                    // Check if this column is an integer type
+                    let column = viewModel.tableColumns.first { $0.key == columnId }
+                    let isInteger = column?.isIntegerType ?? false
+                    cellView?.stringValue = formatValue(value, isInteger: isInteger)
                     cellView?.textColor = .labelColor
                 } else {
                     cellView?.stringValue = "-"
@@ -186,8 +189,11 @@ struct DataTableNSView: NSViewRepresentable {
             return formatter.string(from: date)
         }
 
-        private func formatValue(_ value: Double) -> String {
-            if abs(value) >= 1e6 || (abs(value) < 1e-3 && value != 0) {
+        private func formatValue(_ value: Double, isInteger: Bool = false) -> String {
+            if isInteger {
+                // Format as integer (no decimal point)
+                return String(format: "%.0f", value)
+            } else if abs(value) >= 1e6 || (abs(value) < 1e-3 && value != 0) {
                 return String(format: "%.6e", value)
             } else {
                 return String(format: "%.6f", value)

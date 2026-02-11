@@ -125,6 +125,24 @@ struct TimeSeriesChartView: View {
         visibleDateRange != nil
     }
 
+    /// Common units for the Y-axis label (if all selected variables have the same units)
+    private var yAxisUnits: String? {
+        guard let file = viewModel.cdfFile else { return nil }
+
+        var units: Set<String> = []
+        for key in selectedComponents {
+            // Extract variable name (strip component suffix if present)
+            let varName = key.contains(".") ? String(key.split(separator: ".")[0]) : key
+            if let variable = file.variables.first(where: { $0.name == varName }),
+               let unit = variable.units {
+                units.insert(unit)
+            }
+        }
+
+        // Only return units if all selected variables have the same units
+        return units.count == 1 ? units.first : nil
+    }
+
     @ViewBuilder
     private var chartView: some View {
         ZStack(alignment: .topTrailing) {
@@ -135,6 +153,7 @@ struct TimeSeriesChartView: View {
                 cursorDate: activeDate,
                 isCursorPaused: viewModel.isCursorPaused,
                 colorForSeries: colorForSeries,
+                yAxisLabel: yAxisUnits,
                 onZoom: { scale in applyZoom(scale: scale) },
                 onPan: { delta in applyPan(pixelDelta: delta) },
                 onHover: { date in

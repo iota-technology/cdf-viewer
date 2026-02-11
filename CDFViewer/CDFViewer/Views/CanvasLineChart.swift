@@ -9,6 +9,9 @@ struct CanvasLineChart: View {
     let isCursorPaused: Bool
     let colorForSeries: (String, Int) -> Color
 
+    /// Optional Y-axis label (e.g., units like "meters" or "m/s")
+    var yAxisLabel: String?
+
     // Callbacks for interaction
     var onZoom: ((CGFloat) -> Void)?
     var onPan: ((CGFloat) -> Void)?
@@ -157,6 +160,21 @@ struct CanvasLineChart: View {
                 at: CGPoint(x: plotRect.minX - 5, y: yPos),
                 anchor: .trailing
             )
+        }
+
+        // Draw Y-axis label (units) if provided - rotated 90 degrees
+        if let label = yAxisLabel {
+            var rotatedContext = context
+            let midY = plotRect.midY
+            // Rotate around a point on the left side
+            rotatedContext.translateBy(x: 12, y: midY)
+            rotatedContext.rotate(by: .degrees(-90))
+
+            let labelText = Text(label)
+                .font(.system(size: 11))
+                .foregroundColor(labelColor)
+
+            rotatedContext.draw(labelText, at: .zero, anchor: .center)
         }
     }
 

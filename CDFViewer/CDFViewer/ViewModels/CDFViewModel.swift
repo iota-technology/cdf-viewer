@@ -215,15 +215,19 @@ final class CDFViewModel {
 
                 // Add columns for vector components
                 for (varName, components) in variableComponents.sorted(by: { $0.key < $1.key }) {
+                    let variable = file.variables.first(where: { $0.name == varName })
+                    let isInteger = variable?.dataType.isIntegerType ?? false
                     for component in components.sorted() {
                         let key = "\(varName).\(component)"
-                        columns.append(DataColumn(id: key, name: "\(varName).\(component)", key: key))
+                        columns.append(DataColumn(id: key, name: "\(varName).\(component)", key: key, isIntegerType: isInteger))
                     }
                 }
 
                 // Add columns for scalar variables
                 for varName in scalarVariables.sorted() {
-                    columns.append(DataColumn(id: varName, name: varName, key: varName))
+                    let variable = file.variables.first(where: { $0.name == varName })
+                    let isInteger = variable?.dataType.isIntegerType ?? false
+                    columns.append(DataColumn(id: varName, name: varName, key: varName, isIntegerType: isInteger))
                 }
 
                 // Read data for each variable/component into contiguous arrays
@@ -471,4 +475,12 @@ struct DataColumn: Identifiable {
     let id: String
     let name: String
     let key: String
+    let isIntegerType: Bool
+
+    init(id: String, name: String, key: String, isIntegerType: Bool = false) {
+        self.id = id
+        self.name = name
+        self.key = key
+        self.isIntegerType = isIntegerType
+    }
 }

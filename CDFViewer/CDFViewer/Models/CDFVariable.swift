@@ -129,6 +129,14 @@ struct CDFVariable: Identifiable, Hashable {
         return attributes["DEPEND_1"] ?? attributes["DEPEND_0"]
     }
 
+    /// Get the UNITS attribute value (e.g., "meters", "m/s")
+    var units: String? {
+        if let units = attributes["UNITS"], !units.isEmpty {
+            return units
+        }
+        return nil
+    }
+
     /// SF icon name for this variable type
     var iconName: String {
         if isTimestamp {
