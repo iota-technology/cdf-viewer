@@ -254,9 +254,9 @@ struct TimeSeriesChartView: View {
         // Calculate new duration (zoom in = scale > 1 = shorter duration)
         let newDuration = currentDuration / Double(scale)
 
-        // Clamp to reasonable bounds (min 1 minute, max full range)
+        // Clamp to reasonable bounds (min 0.5 seconds for ~1cm/point at max zoom, max full range)
         let fullDuration = fullRange.upperBound.timeIntervalSince(fullRange.lowerBound)
-        let clampedDuration = min(max(newDuration, 60), fullDuration)
+        let clampedDuration = min(max(newDuration, 0.5), fullDuration)
 
         // If zoomed out to full range or beyond, reset
         if clampedDuration >= fullDuration * 0.99 {

@@ -11,9 +11,15 @@ The primary view for exploring raw CDF data. Shows timestamps and selected varia
 - Chart and Globe views open as auxiliary windows
 
 ### Variable Selection
+
 - Single-select for time variable (used as row index)
 - Multi-select for data variables (each becomes a column)
 - Vector variables expand to X, Y, Z component columns
+
+### Timestamp Format
+
+- Full precision: `yyyy-MM-dd HH:mm:ss.SSS` (milliseconds included)
+- Consistent with chart view's maximum precision level
 
 ### Performance
 - Uses NSTableView (AppKit) for efficient handling of large datasets

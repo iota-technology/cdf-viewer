@@ -57,7 +57,7 @@ struct DataTableNSView: NSViewRepresentable {
             for column in viewModel.tableColumns {
                 let tableColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(column.key))
                 tableColumn.title = column.name
-                tableColumn.width = column.key == "time" ? 220 : 140
+                tableColumn.width = column.key == "time" ? 250 : 140
                 tableColumn.minWidth = 60
                 tableColumn.maxWidth = 400
                 tableColumn.headerCell.alignment = column.key == "time" ? .left : .right
@@ -91,7 +91,7 @@ struct DataTableNSView: NSViewRepresentable {
         // Cached formatters (expensive to create)
         private let timestampFormatter: DateFormatter = {
             let f = DateFormatter()
-            f.dateFormat = "yyyy-MM-dd HH:mm:ss"
+            f.dateFormat = "yyyy-MM-dd HH:mm:ss.SSS"
             return f
         }()
 

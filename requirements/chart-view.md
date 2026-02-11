@@ -6,11 +6,13 @@ Time series visualization for selected variables. Opens as an auxiliary window f
 ## Design Decisions
 
 ### Auxiliary Window
+
 - Opens from toolbar button in main document window
 - Shares ViewModel with Table view (synchronized selection and cursor)
 - Independent window lifecycle (can close without closing document)
 
 ### Variable Selection
+
 - Sidebar mirrors Table view structure
 - Time variable for X-axis (single-select)
 - Data variables for Y-axis (multi-select)
@@ -34,20 +36,26 @@ Time series visualization for selected variables. Opens as an auxiliary window f
 - Two-line layout: time (top), date (bottom)
 - Date only shown at leftmost tick where that date starts
 - Subsequent ticks on the same date show only time
-- Adaptive precision: seconds shown only when tick spacing is sub-minute
-- Determines precision by checking if consecutive ticks share same hour:minute
+- Three precision levels adapting to zoom:
+  - `HH:mm` - default when ticks differ by minutes
+  - `HH:mm:ss` - when consecutive ticks share same hour:minute
+  - `HH:mm:ss.SSS` - when consecutive ticks share same second
+- Tick count reduced for millisecond labels to prevent overlap
 
 ### Hover Interaction
+
 - Hovering shows cursor line and value readouts
 - Values displayed in sidebar next to variable names
 - Only shows values for selected variables
 
 ### Color System
+
 - Each variable gets deterministic color based on name hash
 - Vector components get hue-shifted variants (X, Y: +30°, Z: +60°)
 - Colors persist across sessions via file xattr
 
 ### Cursor Synchronization
+
 - Cursor position shared with Table and Globe views
 - Clicking chart pauses cursor at that timestamp
 - Pause indicated by orange slider tint

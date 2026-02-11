@@ -102,10 +102,17 @@ struct CanvasLineChart: View {
         let xMax = xRange.upperBound.timeIntervalSince1970
         let yRange = calculateYRange(xMin: xMin, xMax: xMax)
 
-        // Draw grid and axes
-        drawGrid(context: context, plotRect: plotRect, xRange: xRange, yRange: yRange)
-        drawYAxis(context: context, plotRect: plotRect, yRange: yRange)
-        drawXAxis(context: context, plotRect: plotRect, xRange: xRange)
+        // Calculate X ticks once (used for both grid and labels)
+        let (xTicks, xPrecision) = calculateAdaptiveXTicks(xRange: xRange, baseCount: 6)
+        let xDivisions = xTicks.count - 1  // Number of divisions between ticks
+
+        // Calculate Y divisions to make roughly square cells
+        let yDivisions = calculateSquareYDivisions(plotRect: plotRect, xDivisions: xDivisions)
+
+        // Draw grid and axes using unified tick positions
+        drawGrid(context: context, plotRect: plotRect, xRange: xRange, xTicks: xTicks, yRange: yRange, yDivisions: yDivisions)
+        drawYAxis(context: context, plotRect: plotRect, yRange: yRange, yDivisions: yDivisions)
+        drawXAxis(context: context, plotRect: plotRect, xRange: xRange, xTicks: xTicks, precision: xPrecision)
 
         // Clip to plot area for line drawing
         var clippedContext = context
@@ -124,12 +131,19 @@ struct CanvasLineChart: View {
         }
     }
 
-    private func drawGrid(context: GraphicsContext, plotRect: CGRect, xRange: ClosedRange<Date>, yRange: ClosedRange<Double>) {
-        let gridColor = Color.gray.opacity(0.2)
+    /// Draws the chart grid lines.
+    /// - Parameters:
+    ///   - xRange: The visible data range (used for coordinate conversion to screen pixels)
+    ///   - xTicks: Grid line positions aligned to "nice" intervals. These may extend slightly
+    ///             beyond xRange because calculateXTicks aligns to round time values.
+    private func drawGrid(context: GraphicsContext, plotRect: CGRect, xRange: ClosedRange<Date>, xTicks: [Date], yRange: ClosedRange<Double>, yDivisions: Int) {
+        guard !xTicks.isEmpty else { return }
 
-        // Horizontal grid lines (5 lines)
-        let yStep = (yRange.upperBound - yRange.lowerBound) / 5
-        for i in 0...5 {
+        let gridColor = Color.gray.opacity(0.3)
+
+        // Horizontal grid lines
+        let yStep = (yRange.upperBound - yRange.lowerBound) / Double(yDivisions)
+        for i in 0...yDivisions {
             let y = yRange.lowerBound + Double(i) * yStep
             let yPos = yToPixel(y, in: plotRect, yRange: yRange)
 
@@ -139,8 +153,9 @@ struct CanvasLineChart: View {
             context.stroke(path, with: .color(gridColor), lineWidth: 0.5)
         }
 
-        // Vertical grid lines (based on time)
-        let xTicks = calculateXTicks(xRange: xRange, count: 6)
+        // Vertical grid lines at X tick positions
+        // Use xRange (not xTicks range) for coordinate conversion so grid lines
+        // align exactly with tick marks and labels drawn by drawXAxis
         for tick in xTicks {
             let xPos = dateToPixel(tick, in: plotRect, xRange: xRange)
             var path = Path()
@@ -150,11 +165,23 @@ struct CanvasLineChart: View {
         }
     }
 
-    private func drawYAxis(context: GraphicsContext, plotRect: CGRect, yRange: ClosedRange<Double>) {
-        let labelColor = Color.secondary
-        let yStep = (yRange.upperBound - yRange.lowerBound) / 5
+    /// Calculate number of Y divisions to make roughly square grid cells
+    private func calculateSquareYDivisions(plotRect: CGRect, xDivisions: Int) -> Int {
+        guard xDivisions > 0 else { return 5 }
 
-        for i in 0...5 {
+        let cellWidth = plotRect.width / CGFloat(xDivisions)
+        let idealYDivisions = plotRect.height / cellWidth
+
+        // Round to nearest reasonable integer (min 3, max 10)
+        let rounded = Int(round(idealYDivisions))
+        return max(3, min(10, rounded))
+    }
+
+    private func drawYAxis(context: GraphicsContext, plotRect: CGRect, yRange: ClosedRange<Double>, yDivisions: Int) {
+        let labelColor = Color.secondary
+        let yStep = (yRange.upperBound - yRange.lowerBound) / Double(yDivisions)
+
+        for i in 0...yDivisions {
             let y = yRange.lowerBound + Double(i) * yStep
             let yPos = yToPixel(y, in: plotRect, yRange: yRange)
 
@@ -187,12 +214,11 @@ struct CanvasLineChart: View {
         }
     }
 
-    private func drawXAxis(context: GraphicsContext, plotRect: CGRect, xRange: ClosedRange<Date>) {
-        let labelColor = Color.secondary
-        let xTicks = calculateXTicks(xRange: xRange, count: 6)
+    private func drawXAxis(context: GraphicsContext, plotRect: CGRect, xRange: ClosedRange<Date>, xTicks: [Date], precision: TimePrecision) {
+        guard !xTicks.isEmpty else { return }
 
-        // Determine if we need seconds precision (when consecutive ticks share the same hour:minute)
-        let needsSeconds = xTicksNeedSeconds(xTicks)
+        let labelColor = Color.secondary
+        let gridColor = Color.gray.opacity(0.3)  // Same as grid lines
 
         // Track which date was last shown to only show date at transitions
         var lastShownDateString: String? = nil
@@ -200,20 +226,33 @@ struct CanvasLineChart: View {
         dateFormatter.dateFormat = "yyyy-MM-dd"
 
         let timeFormatter = DateFormatter()
-        timeFormatter.dateFormat = needsSeconds ? "HH:mm:ss" : "HH:mm"
+        switch precision {
+        case .hourMinute:
+            timeFormatter.dateFormat = "HH:mm"
+        case .seconds:
+            timeFormatter.dateFormat = "HH:mm:ss"
+        case .milliseconds:
+            timeFormatter.dateFormat = "HH:mm:ss.SSS"
+        }
 
         for tick in xTicks {
             let xPos = dateToPixel(tick, in: plotRect, xRange: xRange)
             let tickDateString = dateFormatter.string(from: tick)
 
-            // Draw time label (top line, closer to chart)
+            // Draw tick mark extending down from x-axis (same color as grid)
+            var tickPath = Path()
+            tickPath.move(to: CGPoint(x: xPos, y: plotRect.maxY))
+            tickPath.addLine(to: CGPoint(x: xPos, y: plotRect.maxY + 4))
+            context.stroke(tickPath, with: .color(gridColor), lineWidth: 1)
+
+            // Draw time label (top line, below tick mark)
             let timeText = Text(timeFormatter.string(from: tick))
                 .font(.system(size: 10))
                 .foregroundColor(labelColor)
 
             context.draw(
                 timeText,
-                at: CGPoint(x: xPos, y: plotRect.maxY + 6),
+                at: CGPoint(x: xPos, y: plotRect.maxY + 5),
                 anchor: .top
             )
 
@@ -225,13 +264,52 @@ struct CanvasLineChart: View {
 
                 context.draw(
                     dateText,
-                    at: CGPoint(x: xPos, y: plotRect.maxY + 20),
+                    at: CGPoint(x: xPos, y: plotRect.maxY + 19),
                     anchor: .top
                 )
 
                 lastShownDateString = tickDateString
             }
         }
+    }
+
+    /// Time precision levels for X-axis labels
+    private enum TimePrecision {
+        case hourMinute    // HH:mm
+        case seconds       // HH:mm:ss
+        case milliseconds  // HH:mm:ss.SSS
+    }
+
+    /// Calculate X-axis ticks with adaptive count based on required precision
+    /// Returns fewer ticks when milliseconds are needed to prevent label overlap
+    private func calculateAdaptiveXTicks(xRange: ClosedRange<Date>, baseCount: Int) -> ([Date], TimePrecision) {
+        // First pass: calculate with base count to determine precision needed
+        let initialTicks = calculateXTicks(xRange: xRange, count: baseCount)
+
+        // Check what precision we need
+        let needsMillis = xTicksNeedMilliseconds(initialTicks)
+        let needsSeconds = needsMillis || xTicksNeedSeconds(initialTicks)
+
+        // Adjust tick count based on precision (wider labels need fewer ticks)
+        let adjustedCount: Int
+        let precision: TimePrecision
+        if needsMillis {
+            adjustedCount = max(3, baseCount - 2)  // Fewer ticks for millisecond labels
+            precision = .milliseconds
+        } else if needsSeconds {
+            adjustedCount = baseCount
+            precision = .seconds
+        } else {
+            adjustedCount = baseCount
+            precision = .hourMinute
+        }
+
+        // Recalculate ticks if count changed
+        let finalTicks = (adjustedCount != baseCount)
+            ? calculateXTicks(xRange: xRange, count: adjustedCount)
+            : initialTicks
+
+        return (finalTicks, precision)
     }
 
     /// Determines if X-axis ticks need seconds precision
@@ -249,6 +327,28 @@ struct CanvasLineChart: View {
 
             if prevComponents.hour == currComponents.hour &&
                prevComponents.minute == currComponents.minute {
+                return true
+            }
+        }
+        return false
+    }
+
+    /// Determines if X-axis ticks need milliseconds precision
+    /// Returns true if any consecutive ticks share the same second
+    private func xTicksNeedMilliseconds(_ ticks: [Date]) -> Bool {
+        guard ticks.count >= 2 else { return false }
+
+        let calendar = Calendar.current
+        for i in 1..<ticks.count {
+            let prev = ticks[i - 1]
+            let curr = ticks[i]
+
+            let prevComponents = calendar.dateComponents([.hour, .minute, .second], from: prev)
+            let currComponents = calendar.dateComponents([.hour, .minute, .second], from: curr)
+
+            if prevComponents.hour == currComponents.hour &&
+               prevComponents.minute == currComponents.minute &&
+               prevComponents.second == currComponents.second {
                 return true
             }
         }
@@ -383,17 +483,23 @@ struct CanvasLineChart: View {
     private func dateToPixel(_ date: Date, in rect: CGRect, xRange: ClosedRange<Date>) -> CGFloat {
         let xMin = xRange.lowerBound.timeIntervalSince1970
         let xMax = xRange.upperBound.timeIntervalSince1970
-        let fraction = (date.timeIntervalSince1970 - xMin) / (xMax - xMin)
+        let rangeDuration = xMax - xMin
+        guard rangeDuration > 0 else { return rect.midX }  // Avoid division by zero
+        let fraction = (date.timeIntervalSince1970 - xMin) / rangeDuration
         return rect.minX + CGFloat(fraction) * rect.width
     }
 
     private func timestampToPixel(_ timestamp: Double, in rect: CGRect, xMin: Double, xMax: Double) -> CGFloat {
-        let fraction = (timestamp - xMin) / (xMax - xMin)
+        let rangeDuration = xMax - xMin
+        guard rangeDuration > 0 else { return rect.midX }  // Avoid division by zero
+        let fraction = (timestamp - xMin) / rangeDuration
         return rect.minX + CGFloat(fraction) * rect.width
     }
 
     private func yToPixel(_ value: Double, in rect: CGRect, yRange: ClosedRange<Double>) -> CGFloat {
-        let fraction = (value - yRange.lowerBound) / (yRange.upperBound - yRange.lowerBound)
+        let rangeSpan = yRange.upperBound - yRange.lowerBound
+        guard rangeSpan > 0 else { return rect.midY }  // Avoid division by zero
+        let fraction = (value - yRange.lowerBound) / rangeSpan
         // Y is inverted (0 at top)
         return rect.maxY - CGFloat(fraction) * rect.height
     }
@@ -415,16 +521,66 @@ struct CanvasLineChart: View {
         }
     }
 
+    /// Calculates X-axis tick positions aligned to "nice" time intervals.
+    /// Returns at least one tick for any valid range. Ticks are aligned to round time values
+    /// (e.g., on the minute, on 5-second boundaries) so panning feels like sliding paper.
     private func calculateXTicks(xRange: ClosedRange<Date>, count: Int) -> [Date] {
         let duration = xRange.upperBound.timeIntervalSince(xRange.lowerBound)
-        let step = duration / Double(count)
-
-        var ticks: [Date] = []
-        for i in 0...count {
-            let date = xRange.lowerBound.addingTimeInterval(Double(i) * step)
-            ticks.append(date)
+        guard duration > 0 else {
+            // Degenerate case: zero-width range, return single tick at start
+            return [xRange.lowerBound]
         }
+        let idealStep = duration / Double(count)
+
+        // Find a "nice" step size that divides evenly into time units
+        let niceStep = niceTimeInterval(idealStep)
+
+        // Find the first tick at or after the range start, aligned to the nice interval
+        let startTimestamp = xRange.lowerBound.timeIntervalSince1970
+        let endTimestamp = xRange.upperBound.timeIntervalSince1970
+
+        // Align to the nice interval (floor to previous round value)
+        let firstTickTimestamp = floor(startTimestamp / niceStep) * niceStep
+
+        // Generate ticks
+        var ticks: [Date] = []
+        var timestamp = firstTickTimestamp
+        while timestamp <= endTimestamp + niceStep * 0.01 {  // Small tolerance for floating point
+            if timestamp >= startTimestamp - niceStep * 0.01 {
+                ticks.append(Date(timeIntervalSince1970: timestamp))
+            }
+            timestamp += niceStep
+        }
+
         return ticks
+    }
+
+    /// Find a "nice" time interval close to the target
+    /// Returns intervals like 1s, 2s, 5s, 10s, 15s, 30s, 1min, 2min, 5min, etc.
+    private func niceTimeInterval(_ target: TimeInterval) -> TimeInterval {
+        // Define nice intervals in seconds
+        let niceIntervals: [TimeInterval] = [
+            0.001, 0.002, 0.005, 0.01, 0.02, 0.05,           // milliseconds
+            0.1, 0.2, 0.5,                                    // tenths of seconds
+            1, 2, 5, 10, 15, 30,                              // seconds
+            60, 2*60, 5*60, 10*60, 15*60, 30*60,              // minutes
+            3600, 2*3600, 6*3600, 12*3600,                    // hours
+            86400, 2*86400, 7*86400                           // days
+        ]
+
+        // Find the closest nice interval
+        var bestInterval = niceIntervals[0]
+        var bestDiff = abs(target - bestInterval)
+
+        for interval in niceIntervals {
+            let diff = abs(target - interval)
+            if diff < bestDiff {
+                bestDiff = diff
+                bestInterval = interval
+            }
+        }
+
+        return bestInterval
     }
 }
 
