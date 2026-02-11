@@ -5,6 +5,26 @@ All notable changes to CDF Viewer will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.0] - 2026-02-11
+
+### Added
+
+- Welcome window shown when app launches with no documents open
+- File menu with Open action (Cmd+O)
+- Association-based variable filtering in chart view (using DEPEND_0 attribute)
+- Adaptive LCH color algorithm for vector components (handles white, black, gray base colors)
+- Two-line timestamp format in chart sidebar (date + time with milliseconds)
+
+### Changed
+
+- Vector component colors (X, Y, Z) now use adaptive algorithm that adjusts lightness and chroma based on base color characteristics
+- Variables without DEPEND_0 are treated as compatible with any time variable
+
+### Fixed
+
+- Chart grid lines now align exactly with tick marks when panning
+- Vector component colors now visually distinguishable for all base colors (including near-white, near-black, and gray)
+
 ## [0.8.0] - 2025-02-11
 
 ### Added
