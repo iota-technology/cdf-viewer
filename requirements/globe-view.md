@@ -45,3 +45,26 @@ Visualize satellite orbital position data on a 3D Earth globe with time-synchron
 - Sidebar follows system light/dark mode appearance
 - Implementation uses dual SceneView (interactive in detail, visual-only as background)
 - Camera controls (rotate, zoom, pan) work only in detail area (not under sidebar)
+
+### Seasonal Earth Textures
+
+- Uses NASA Blue Marble monthly composites (12 textures, one per month)
+- Textures represent Earth's appearance on approximately the 1st of each month
+- Smooth blending between consecutive months based on day of month
+- Blend formula: `blendFactor = (dayOfMonth - 1) / daysInMonth`
+- Example: February 15th blends ~50% February texture with ~50% March texture
+
+### Day/Night Cycle
+
+- Sun position calculated from timestamp using astronomical formulas
+- Solar declination varies seasonally: +23.45° (summer solstice) to -23.45° (winter solstice)
+- Hour angle based on UTC time: sun at longitude 0° at 12:00 UTC, moving 15°/hour westward
+- Coordinate conversion from ECEF to SceneKit (X stays, ECEF Z→SceneKit Y, ECEF Y→SceneKit -Z)
+
+### City Lights (Black Marble)
+
+- Night side shows city lights from NASA Black Marble texture
+- Applied as emission map, visible only on dark side of Earth
+- Warm yellow-orange tint (RGB: 1.0, 0.85, 0.5) for realistic city light appearance
+- Terminator transition: ~15° (0.26 radians) smooth fade using smoothstep
+- Day side dims to 2% ambient to prevent complete blackout while maintaining contrast

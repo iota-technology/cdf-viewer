@@ -43,6 +43,9 @@ struct GlobeView: View {
     @State private var speedMultiplier: Double = 600.0
     @State private var lastExternalProgress: Double = 1.0  // Track external changes
 
+    // Earth material manager for seasonal textures and day/night cycle
+    @State private var earthMaterial = EarthMaterial()
+
     private let speedOptions: [(label: String, value: Double)] = [
         ("60×", 60),
         ("300×", 300),
@@ -146,6 +149,9 @@ struct GlobeView: View {
         }
         .onChange(of: viewModel.variableOverrides) { _, _ in
             updateTrackColors()
+        }
+        .onChange(of: currentTimestamp) { _, newTimestamp in
+            updateSunPosition(for: newTimestamp)
         }
         .onKeyPress(.space) {
             if !tracks.isEmpty {
@@ -342,12 +348,10 @@ struct GlobeView: View {
         let earthRadius = earthRadiusKm * metersToSceneUnits * 1000
         let earthGeometry = SCNSphere(radius: CGFloat(earthRadius))
 
-        // Earth material with texture
-        let earthMaterial = SCNMaterial()
-        earthMaterial.diffuse.contents = createEarthTexture()
-        earthMaterial.specular.contents = NSColor.gray
-        earthMaterial.shininess = 0.1
-        earthGeometry.materials = [earthMaterial]
+        // Earth material with seasonal textures
+        let currentDate = currentTimestamp ?? Date()
+        let material = earthMaterial.createMaterial(for: currentDate)
+        earthGeometry.materials = [material]
 
         let earthNode = SCNNode(geometry: earthGeometry)
         earthNode.name = "earth"
@@ -362,20 +366,21 @@ struct GlobeView: View {
         cameraNode.name = "camera"
         newScene.rootNode.addChildNode(cameraNode)
 
-        // Ambient light
+        // Ambient light - low so night side is dark but city lights show
         let ambientLight = SCNNode()
         ambientLight.light = SCNLight()
         ambientLight.light?.type = .ambient
-        ambientLight.light?.intensity = 300
+        ambientLight.light?.intensity = 50
         ambientLight.name = "ambientLight"
         newScene.rootNode.addChildNode(ambientLight)
 
-        // Directional light (sun)
+        // Directional light (sun) - very bright for vivid day side
         let sunLight = SCNNode()
         sunLight.light = SCNLight()
         sunLight.light?.type = .directional
-        sunLight.light?.intensity = 1000
-        sunLight.position = SCNVector3(x: 100, y: 100, z: 100)
+        sunLight.light?.intensity = 5000
+        let initialDate = currentTimestamp ?? Date()
+        sunLight.position = EarthMaterial.sunPosition(for: initialDate)
         sunLight.look(at: SCNVector3(0, 0, 0))
         sunLight.name = "sunLight"
         newScene.rootNode.addChildNode(sunLight)
@@ -553,14 +558,22 @@ struct GlobeView: View {
         trackVerticesCache = [:]
     }
 
-    private func createEarthTexture() -> Any {
-        // Load NASA Blue Marble texture
-        if let url = Bundle.main.url(forResource: "blue_marble", withExtension: "jpg"),
-           let image = NSImage(contentsOf: url) {
-            return image
+    /// Updates sun light position and Earth material based on the current timestamp
+    private func updateSunPosition(for date: Date?) {
+        guard let scene = scene,
+              let date = date else { return }
+
+        // Update sun position
+        if let sunLight = scene.rootNode.childNode(withName: "sunLight", recursively: false) {
+            sunLight.position = EarthMaterial.sunPosition(for: date)
+            sunLight.look(at: SCNVector3(0, 0, 0))
         }
-        // Fallback to simple blue color if texture not found
-        return NSColor(red: 0.1, green: 0.3, blue: 0.6, alpha: 1.0)
+
+        // Update Earth material for seasonal blending
+        if let earthNode = scene.rootNode.childNode(withName: "earth", recursively: false),
+           let material = earthNode.geometry?.firstMaterial {
+            earthMaterial.updateMaterial(material, for: date)
+        }
     }
 
     // MARK: - Coordinate Conversion
