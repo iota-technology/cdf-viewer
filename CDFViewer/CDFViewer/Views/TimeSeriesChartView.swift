@@ -7,6 +7,13 @@ struct TimeSeriesChartView: View {
     @State private var selectedTimeVariable: CDFVariable?
     @State private var selectedComponents: Set<String> = [] // "varName" or "varName.X"
 
+    // Static formatter for time with milliseconds (expensive to create, reuse)
+    private static let timeWithMillisFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "HH:mm:ss.SSS"
+        return f
+    }()
+
     // Sidebar visibility (Photos-style toggle)
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
 
@@ -65,10 +72,15 @@ struct TimeSeriesChartView: View {
             singleSelectionTrailing: { variable in
                 // Show timestamp for selected time variable when hovering
                 if selectedTimeVariable == variable, let date = activeDate {
-                    HStack(spacing: 4) {
-                        Text(date, format: .dateTime.month().day().hour().minute().second())
-                            .font(.system(size: 11, design: .monospaced))
-                            .foregroundStyle(.secondary)
+                    HStack(alignment: .top, spacing: 4) {
+                        VStack(alignment: .trailing, spacing: 1) {
+                            Text(date, format: .dateTime.year().month().day())
+                                .font(.system(size: 10, design: .monospaced))
+                                .foregroundStyle(.secondary)
+                            Text(Self.timeWithMillisFormatter.string(from: date))
+                                .font(.system(size: 10, design: .monospaced))
+                                .foregroundStyle(.secondary)
+                        }
                         if viewModel.isCursorPaused {
                             Image(systemName: "pause.fill")
                                 .font(.system(size: 9))
