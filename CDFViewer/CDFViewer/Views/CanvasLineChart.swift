@@ -59,19 +59,22 @@ struct CanvasLineChart: View {
         visibleXRange ?? fullXRange ?? (Date.distantPast...Date.distantFuture)
     }
 
-    private var yRange: ClosedRange<Double> {
-        let xRange = currentXRange
+    /// Calculate Y range using binary search to find visible points (O(log n) + O(visible points))
+    private func calculateYRange(xMin: Double, xMax: Double) -> ClosedRange<Double> {
         var minY = Double.infinity
         var maxY = -Double.infinity
 
         for s in series {
-            for point in s.points {
-                // Only consider finite points in visible X range
-                if point.value.isFinite &&
-                   point.timestamp >= xRange.lowerBound.timeIntervalSince1970 &&
-                   point.timestamp <= xRange.upperBound.timeIntervalSince1970 {
-                    minY = min(minY, point.value)
-                    maxY = max(maxY, point.value)
+            // Use binary search to find the range of visible points
+            let (startIdx, endIdx) = s.visibleRange(xMin: xMin, xMax: xMax)
+            guard startIdx < endIdx else { continue }
+
+            // Only iterate visible points
+            for i in startIdx..<endIdx {
+                let value = s.points[i].value
+                if value.isFinite {
+                    minY = min(minY, value)
+                    maxY = max(maxY, value)
                 }
             }
         }
@@ -93,7 +96,9 @@ struct CanvasLineChart: View {
 
     private func drawChart(context: GraphicsContext, size: CGSize, plotRect: CGRect) {
         let xRange = currentXRange
-        let yRange = self.yRange
+        let xMin = xRange.lowerBound.timeIntervalSince1970
+        let xMax = xRange.upperBound.timeIntervalSince1970
+        let yRange = calculateYRange(xMin: xMin, xMax: xMax)
 
         // Draw grid and axes
         drawGrid(context: context, plotRect: plotRect, xRange: xRange, yRange: yRange)
@@ -104,9 +109,11 @@ struct CanvasLineChart: View {
         var clippedContext = context
         clippedContext.clip(to: Path(plotRect))
 
-        // Draw each series
+        // Draw each series with downsampling for performance
+        let targetPoints = Int(plotRect.width * 2)  // ~2 points per pixel for smooth lines
         for (index, s) in series.enumerated() {
-            drawSeries(context: clippedContext, series: s, index: index, plotRect: plotRect, xRange: xRange, yRange: yRange)
+            drawSeries(context: clippedContext, series: s, index: index, plotRect: plotRect,
+                      xMin: xMin, xMax: xMax, yRange: yRange, targetPoints: targetPoints)
         }
 
         // Draw cursor line (unclipped for full height)
@@ -197,33 +204,46 @@ struct CanvasLineChart: View {
         }
     }
 
-    private func drawSeries(context: GraphicsContext, series: CanvasChartSeries, index: Int, plotRect: CGRect, xRange: ClosedRange<Date>, yRange: ClosedRange<Double>) {
+    private func drawSeries(context: GraphicsContext, series: CanvasChartSeries, index: Int,
+                           plotRect: CGRect, xMin: Double, xMax: Double,
+                           yRange: ClosedRange<Double>, targetPoints: Int) {
         let color = colorForSeries(series.name, index)
-        let xMin = xRange.lowerBound.timeIntervalSince1970
-        let xMax = xRange.upperBound.timeIntervalSince1970
 
-        // Filter to visible points with small margin, excluding NaN/infinite values
+        // Use binary search to find visible range (O(log n))
         let margin = (xMax - xMin) * 0.01
-        let visiblePoints = series.points.filter { point in
-            point.timestamp >= (xMin - margin) && point.timestamp <= (xMax + margin) &&
-            point.value.isFinite
+        let (startIdx, endIdx) = series.visibleRange(xMin: xMin - margin, xMax: xMax + margin)
+
+        let visibleCount = endIdx - startIdx
+        guard visibleCount >= 2 else { return }
+
+        // Downsample if we have more points than needed
+        let points: [(timestamp: Double, value: Double)]
+        if visibleCount > targetPoints {
+            points = downsampleMinMax(series: series, startIdx: startIdx, endIdx: endIdx,
+                                     targetBuckets: targetPoints / 2)
+        } else {
+            // Use points directly without creating new array
+            points = (startIdx..<endIdx).compactMap { i in
+                let p = series.points[i]
+                return p.value.isFinite ? (p.timestamp, p.value) : nil
+            }
         }
 
-        guard visiblePoints.count >= 2 else { return }
+        guard points.count >= 2 else { return }
 
-        // Build path, handling gaps from filtered NaN values
+        // Build path
         var path = Path()
         var lastTimestamp: Double?
+        let avgSpacing = (xMax - xMin) / Double(points.count)
 
-        for point in visiblePoints {
+        for point in points {
             let x = timestampToPixel(point.timestamp, in: plotRect, xMin: xMin, xMax: xMax)
             let y = yToPixel(point.value, in: plotRect, yRange: yRange)
             let cgPoint = CGPoint(x: x, y: y)
 
-            // Check for data gap (more than 2x average spacing suggests missing data)
+            // Check for data gap
             let isGap: Bool
-            if let last = lastTimestamp, visiblePoints.count > 1 {
-                let avgSpacing = (xMax - xMin) / Double(visiblePoints.count)
+            if let last = lastTimestamp {
                 isGap = (point.timestamp - last) > avgSpacing * 3
             } else {
                 isGap = false
@@ -238,6 +258,57 @@ struct CanvasLineChart: View {
         }
 
         context.stroke(path, with: .color(color), lineWidth: 1)
+    }
+
+    /// Min-max downsampling: preserves peaks and valleys for visual accuracy
+    /// Each bucket outputs its min and max values, maintaining the visual shape
+    private func downsampleMinMax(series: CanvasChartSeries, startIdx: Int, endIdx: Int,
+                                  targetBuckets: Int) -> [(timestamp: Double, value: Double)] {
+        let count = endIdx - startIdx
+        let bucketSize = max(1, count / targetBuckets)
+        var result: [(timestamp: Double, value: Double)] = []
+        result.reserveCapacity(targetBuckets * 2)
+
+        var i = startIdx
+        while i < endIdx {
+            let bucketEnd = min(i + bucketSize, endIdx)
+
+            var minVal = Double.infinity
+            var maxVal = -Double.infinity
+            var minIdx = i
+            var maxIdx = i
+
+            // Find min and max in this bucket
+            for j in i..<bucketEnd {
+                let p = series.points[j]
+                guard p.value.isFinite else { continue }
+                if p.value < minVal {
+                    minVal = p.value
+                    minIdx = j
+                }
+                if p.value > maxVal {
+                    maxVal = p.value
+                    maxIdx = j
+                }
+            }
+
+            // Add min and max in timestamp order (preserves correct line direction)
+            if minVal.isFinite && maxVal.isFinite {
+                if minIdx <= maxIdx {
+                    result.append((series.points[minIdx].timestamp, minVal))
+                    if minIdx != maxIdx {
+                        result.append((series.points[maxIdx].timestamp, maxVal))
+                    }
+                } else {
+                    result.append((series.points[maxIdx].timestamp, maxVal))
+                    result.append((series.points[minIdx].timestamp, minVal))
+                }
+            }
+
+            i = bucketEnd
+        }
+
+        return result
     }
 
     private func drawCursor(context: GraphicsContext, date: Date, plotRect: CGRect, xRange: ClosedRange<Date>) {
@@ -318,6 +389,40 @@ struct CanvasChartSeries: Identifiable {
     let id = UUID()
     let name: String
     let points: [CanvasChartPoint]
+
+    /// Binary search to find the range of points within [xMin, xMax]
+    /// Returns (startIndex, endIndex) where endIndex is exclusive
+    func visibleRange(xMin: Double, xMax: Double) -> (Int, Int) {
+        guard !points.isEmpty else { return (0, 0) }
+
+        // Find first point >= xMin using binary search
+        var lo = 0
+        var hi = points.count
+        while lo < hi {
+            let mid = (lo + hi) / 2
+            if points[mid].timestamp < xMin {
+                lo = mid + 1
+            } else {
+                hi = mid
+            }
+        }
+        let startIdx = lo
+
+        // Find first point > xMax using binary search
+        lo = startIdx
+        hi = points.count
+        while lo < hi {
+            let mid = (lo + hi) / 2
+            if points[mid].timestamp <= xMax {
+                lo = mid + 1
+            } else {
+                hi = mid
+            }
+        }
+        let endIdx = lo
+
+        return (startIdx, endIdx)
+    }
 }
 
 struct CanvasChartPoint {

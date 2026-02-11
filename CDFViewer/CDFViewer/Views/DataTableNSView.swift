@@ -63,6 +63,9 @@ struct DataTableNSView: NSViewRepresentable {
                 tableColumn.headerCell.alignment = column.key == "time" ? .left : .right
                 tableView.addTableColumn(tableColumn)
             }
+
+            // Rebuild column cache for fast lookups
+            context.coordinator.rebuildColumnCache()
         }
 
         // Reload data
@@ -82,9 +85,27 @@ struct DataTableNSView: NSViewRepresentable {
         weak var scrollView: NSScrollView?
         private var isUpdatingSelection = false
 
+        // Cached lookups for performance (rebuilt when columns change)
+        private var columnIsInteger: [String: Bool] = [:]
+
+        // Cached formatters (expensive to create)
+        private let timestampFormatter: DateFormatter = {
+            let f = DateFormatter()
+            f.dateFormat = "yyyy-MM-dd HH:mm:ss"
+            return f
+        }()
+
         init(viewModel: CDFViewModel) {
             self.viewModel = viewModel
             super.init()
+        }
+
+        /// Rebuild column caches when columns change
+        func rebuildColumnCache() {
+            columnIsInteger = [:]
+            for col in viewModel.tableColumns {
+                columnIsInteger[col.key] = col.isIntegerType
+            }
         }
 
         // MARK: - NSTableViewDataSource
@@ -123,9 +144,8 @@ struct DataTableNSView: NSViewRepresentable {
             } else {
                 cellView?.alignment = .right
                 if let value = viewModel.value(column: columnId, at: row) {
-                    // Check if this column is an integer type
-                    let column = viewModel.tableColumns.first { $0.key == columnId }
-                    let isInteger = column?.isIntegerType ?? false
+                    // Use cached lookup for O(1) integer type check
+                    let isInteger = columnIsInteger[columnId] ?? false
                     cellView?.stringValue = formatValue(value, isInteger: isInteger)
                     cellView?.textColor = .labelColor
                 } else {
@@ -184,9 +204,7 @@ struct DataTableNSView: NSViewRepresentable {
         // MARK: - Formatting
 
         private func formatTimestamp(_ date: Date) -> String {
-            let formatter = DateFormatter()
-            formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
-            return formatter.string(from: date)
+            return timestampFormatter.string(from: date)
         }
 
         private func formatValue(_ value: Double, isInteger: Bool = false) -> String {
