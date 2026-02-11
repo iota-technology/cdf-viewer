@@ -93,6 +93,9 @@ struct GlobeView: View {
                 isAnimating = false
             }
         }
+        .onChange(of: viewModel.variableOverrides) { _, _ in
+            updateTrackColors()
+        }
         .onKeyPress(.space) {
             if !tracks.isEmpty {
                 toggleAnimation()
@@ -417,6 +420,30 @@ struct GlobeView: View {
         // Use custom color from metadata if set
         let swiftColor = viewModel.colorFor(varName, index: index, palette: trackColorPalette)
         return NSColor(swiftColor)
+    }
+
+    /// Updates track and marker colors when metadata changes
+    private func updateTrackColors() {
+        guard let scene = scene else { return }
+
+        let sortedVars = selectedPositionVariables.sorted()
+        for (index, varName) in sortedVars.enumerated() {
+            let color = nsColorForTrack(varName: varName, index: index)
+
+            // Update track color
+            if let trackNode = scene.rootNode.childNode(withName: "track_\(varName)", recursively: false),
+               let material = trackNode.geometry?.firstMaterial {
+                material.diffuse.contents = color
+                material.emission.contents = color
+            }
+
+            // Update marker color
+            if let markerNode = scene.rootNode.childNode(withName: "marker_\(varName)", recursively: false),
+               let material = markerNode.geometry?.firstMaterial {
+                material.diffuse.contents = color
+                material.emission.contents = color
+            }
+        }
     }
 
     /// Updates track visibility based on current progress

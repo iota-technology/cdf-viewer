@@ -69,8 +69,8 @@ struct VariableInfoPopover: View {
                 }
             }
 
-            // Positional toggle (Globe view only)
-            if showPositionalToggle {
+            // Positional toggle (Globe view only, for 3-vec variables)
+            if showPositionalToggle && variable.isVector {
                 Divider()
 
                 Toggle("Use as Position Data", isOn: $isPositional)
@@ -80,7 +80,7 @@ struct VariableInfoPopover: View {
                     }
                     .help("When enabled, this variable will be displayed as positions on the 3D globe")
 
-                if variable.isVector && !variable.isECEFPosition {
+                if !variable.isECEFPosition {
                     Text("Not automatically detected as position data")
                         .font(.caption)
                         .foregroundStyle(.secondary)
