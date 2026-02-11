@@ -1,5 +1,4 @@
 import SwiftUI
-import Charts
 
 struct TimeSeriesChartView: View {
     @Bindable var viewModel: CDFViewModel
@@ -11,10 +10,14 @@ struct TimeSeriesChartView: View {
     // Sidebar visibility (Photos-style toggle)
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
 
-    // Chart data
-    @State private var chartSeries: [ChartSeries] = []
+    // Chart data - full resolution for Canvas rendering
+    @State private var chartSeries: [CanvasChartSeries] = []
     @State private var isLoading = false
     @State private var errorMessage: String?
+
+    // Zoom/pan state
+    @State private var visibleDateRange: ClosedRange<Date>?  // nil = show all data
+    @State private var fullDateRange: ClosedRange<Date>?     // Full extent of data
 
     // Use shared cursor from viewModel
     private var activeDate: Date? {
@@ -117,80 +120,122 @@ struct TimeSeriesChartView: View {
         }
     }
 
+    /// Whether the chart is currently zoomed (not showing full range)
+    private var isZoomed: Bool {
+        visibleDateRange != nil
+    }
+
     @ViewBuilder
     private var chartView: some View {
-        Chart {
-            ForEach(Array(chartSeries.enumerated()), id: \.element.id) { index, series in
-                ForEach(series.points) { point in
-                    LineMark(
-                        x: .value("Time", point.date),
-                        y: .value(series.name, point.value),
-                        series: .value("Series", series.name)
-                    )
-                    .foregroundStyle(colorForSeries(name: series.name, index: index))
-                }
-            }
-            // Cursor line moved to overlay to prevent chart re-renders on hover
-        }
-        .chartXAxis {
-            AxisMarks(values: .automatic) { _ in
-                AxisGridLine()
-                AxisTick()
-                AxisValueLabel(format: .dateTime.month().day().hour().minute())
-            }
-        }
-        .chartYAxis {
-            AxisMarks(position: .leading)
-        }
-        .chartLegend(.hidden)
-        .chartOverlay { proxy in
-            GeometryReader { geometry in
-                // Draw cursor line as Path overlay (avoids chart re-render)
-                if let date = activeDate, let plotFrame = proxy.plotFrame {
-                    let plotRect = geometry[plotFrame]
-                    if let xPosition = proxy.position(forX: date) {
-                        Path { path in
-                            path.move(to: CGPoint(x: plotRect.origin.x + xPosition, y: plotRect.origin.y))
-                            path.addLine(to: CGPoint(x: plotRect.origin.x + xPosition, y: plotRect.origin.y + plotRect.height))
-                        }
-                        .stroke(
-                            viewModel.isCursorPaused ? Color.orange.opacity(0.7) : Color.gray.opacity(0.5),
-                            style: StrokeStyle(
-                                lineWidth: viewModel.isCursorPaused ? 2 : 1,
-                                dash: viewModel.isCursorPaused ? [] : [5, 5]
-                            )
-                        )
+        ZStack(alignment: .topTrailing) {
+            CanvasLineChart(
+                series: chartSeries,
+                visibleXRange: visibleDateRange,
+                fullXRange: fullDateRange,
+                cursorDate: activeDate,
+                isCursorPaused: viewModel.isCursorPaused,
+                colorForSeries: colorForSeries,
+                onZoom: { scale in applyZoom(scale: scale) },
+                onPan: { delta in applyPan(pixelDelta: delta) },
+                onHover: { date in
+                    guard !viewModel.isCursorPaused else { return }
+                    if let date = date {
+                        viewModel.cursorDate = date
+                    } else {
+                        viewModel.clearCursor()
                     }
-                }
+                },
+                onTap: { viewModel.toggleCursorPause() }
+            )
 
-                // Invisible rectangle for mouse tracking
-                Rectangle()
-                    .fill(.clear)
-                    .contentShape(Rectangle())
-                    .onContinuousHover { phase in
-                        guard !viewModel.isCursorPaused else { return }
-                        switch phase {
-                        case .active(let location):
-                            // Adjust for plot area offset (accounts for y-axis labels)
-                            if let plotFrame = proxy.plotFrame {
-                                let plotRect = geometry[plotFrame]
-                                let adjustedX = location.x - plotRect.origin.x
-                                // Only update if within plot area bounds
-                                if adjustedX >= 0 && adjustedX <= plotRect.width {
-                                    if let date: Date = proxy.value(atX: adjustedX) {
-                                        viewModel.cursorDate = date
-                                    }
-                                }
-                            }
-                        case .ended:
-                            viewModel.clearCursor()
-                        }
-                    }
-                    .onTapGesture {
-                        viewModel.toggleCursorPause()
-                    }
+            // Reset button (shown when zoomed)
+            if isZoomed {
+                Button(action: resetZoom) {
+                    Label("Reset", systemImage: "arrow.counterclockwise")
+                        .font(.system(size: 12))
+                }
+                .buttonStyle(.bordered)
+                .padding(8)
             }
         }
+    }
+
+    // MARK: - Zoom/Pan
+
+    /// Apply zoom centered on chart midpoint
+    private func applyZoom(scale: CGFloat) {
+        guard let fullRange = fullDateRange else { return }
+
+        let currentRange = visibleDateRange ?? fullRange
+        let currentDuration = currentRange.upperBound.timeIntervalSince(currentRange.lowerBound)
+        let midpoint = currentRange.lowerBound.addingTimeInterval(currentDuration / 2)
+
+        // Calculate new duration (zoom in = scale > 1 = shorter duration)
+        let newDuration = currentDuration / Double(scale)
+
+        // Clamp to reasonable bounds (min 1 minute, max full range)
+        let fullDuration = fullRange.upperBound.timeIntervalSince(fullRange.lowerBound)
+        let clampedDuration = min(max(newDuration, 60), fullDuration)
+
+        // If zoomed out to full range or beyond, reset
+        if clampedDuration >= fullDuration * 0.99 {
+            visibleDateRange = nil
+            return
+        }
+
+        // Calculate new range centered on midpoint
+        let halfDuration = clampedDuration / 2
+        var newStart = midpoint.addingTimeInterval(-halfDuration)
+        var newEnd = midpoint.addingTimeInterval(halfDuration)
+
+        // Clamp to full range bounds
+        if newStart < fullRange.lowerBound {
+            newStart = fullRange.lowerBound
+            newEnd = newStart.addingTimeInterval(clampedDuration)
+        }
+        if newEnd > fullRange.upperBound {
+            newEnd = fullRange.upperBound
+            newStart = newEnd.addingTimeInterval(-clampedDuration)
+        }
+
+        visibleDateRange = newStart...newEnd
+    }
+
+    /// Apply pan (horizontal scroll) - delta is in pixels
+    private func applyPan(pixelDelta: CGFloat) {
+        guard let fullRange = fullDateRange else { return }
+
+        let currentRange = visibleDateRange ?? fullRange
+        let currentDuration = currentRange.upperBound.timeIntervalSince(currentRange.lowerBound)
+        let fullDuration = fullRange.upperBound.timeIntervalSince(fullRange.lowerBound)
+
+        // Don't pan if at full view
+        guard currentDuration < fullDuration * 0.99 else { return }
+
+        // Convert pixel delta to time offset (assume ~800px chart width as baseline)
+        // Natural scrolling: swipe right (positive delta) = reveal earlier content = negative time offset
+        let timePerPixel = currentDuration / 800.0  // Approximate chart width
+        let timeOffset = -Double(pixelDelta) * timePerPixel
+
+        var newStart = currentRange.lowerBound.addingTimeInterval(timeOffset)
+        var newEnd = currentRange.upperBound.addingTimeInterval(timeOffset)
+
+        // Clamp to full range bounds
+        if newStart < fullRange.lowerBound {
+            newStart = fullRange.lowerBound
+            newEnd = newStart.addingTimeInterval(currentDuration)
+        }
+        if newEnd > fullRange.upperBound {
+            newEnd = fullRange.upperBound
+            newStart = newEnd.addingTimeInterval(-currentDuration)
+        }
+
+        visibleDateRange = newStart...newEnd
+    }
+
+    /// Reset zoom to show full data range
+    private func resetZoom() {
+        visibleDateRange = nil
     }
 
     // MARK: - Value Display
@@ -201,9 +246,10 @@ struct TimeSeriesChartView: View {
         // Find the series with this name
         guard let series = chartSeries.first(where: { $0.name == key }),
               let cursorDate = viewModel.cursorDate else { return nil }
-        // Find the closest point to the cursor date
+        let cursorTimestamp = cursorDate.timeIntervalSince1970
+        // Find the closest point to the cursor date using binary search for efficiency
         guard let closest = series.points.min(by: {
-            abs($0.date.timeIntervalSince(cursorDate)) < abs($1.date.timeIntervalSince(cursorDate))
+            abs($0.timestamp - cursorTimestamp) < abs($1.timestamp - cursorTimestamp)
         }) else { return nil }
         return closest.value
     }
@@ -229,6 +275,8 @@ struct TimeSeriesChartView: View {
               let timeVar = selectedTimeVariable,
               !selectedComponents.isEmpty else {
             chartSeries = []
+            fullDateRange = nil
+            visibleDateRange = nil
             return
         }
 
@@ -240,7 +288,7 @@ struct TimeSeriesChartView: View {
                 // Read timestamps
                 let timestamps = try file.readTimestamps(for: timeVar)
 
-                var series: [ChartSeries] = []
+                var series: [CanvasChartSeries] = []
 
                 // Group selected components by variable
                 var variableComponents: [String: [String]] = [:] // varName -> [X, Y, Z]
@@ -257,7 +305,7 @@ struct TimeSeriesChartView: View {
                     }
                 }
 
-                // Load vector component data
+                // Load vector component data - full resolution
                 for (varName, components) in variableComponents {
                     guard let variable = file.variables.first(where: { $0.name == varName }) else { continue }
                     let values = try file.readDoubles(for: variable)
@@ -267,98 +315,53 @@ struct TimeSeriesChartView: View {
                     for component in components {
                         guard let compIndex = componentNames.firstIndex(of: component) else { continue }
 
-                        // Extract component values
-                        var componentValues: [Double] = []
-                        componentValues.reserveCapacity(timestamps.count)
+                        // Extract component values at full resolution
+                        var points: [CanvasChartPoint] = []
+                        points.reserveCapacity(timestamps.count)
                         for i in 0..<timestamps.count {
                             let valueIndex = i * elementsPerRecord + compIndex
                             if valueIndex < values.count {
-                                componentValues.append(values[valueIndex])
+                                points.append(CanvasChartPoint(timestamp: timestamps[i], value: values[valueIndex]))
                             }
                         }
 
-                        // Apply min-max decimation
-                        let points = minMaxDecimate(timestamps: timestamps, values: componentValues, targetPoints: 5000)
                         let seriesName = "\(varName).\(component)"
-                        series.append(ChartSeries(name: seriesName, points: points))
+                        series.append(CanvasChartSeries(name: seriesName, points: points))
                     }
                 }
 
-                // Load scalar data
+                // Load scalar data - full resolution
                 for varName in scalarVariables {
                     guard let variable = file.variables.first(where: { $0.name == varName }) else { continue }
                     let values = try file.readDoubles(for: variable)
 
-                    // Apply min-max decimation
-                    let points = minMaxDecimate(timestamps: timestamps, values: Array(values.prefix(timestamps.count)), targetPoints: 5000)
-                    series.append(ChartSeries(name: varName, points: points))
+                    var points: [CanvasChartPoint] = []
+                    let count = min(timestamps.count, values.count)
+                    points.reserveCapacity(count)
+                    for i in 0..<count {
+                        points.append(CanvasChartPoint(timestamp: timestamps[i], value: values[i]))
+                    }
+
+                    series.append(CanvasChartSeries(name: varName, points: points))
                 }
 
                 chartSeries = series
                 isLoading = false
+
+                // Calculate full date range from timestamps
+                if let minTime = timestamps.min(), let maxTime = timestamps.max() {
+                    fullDateRange = Date(timeIntervalSince1970: minTime)...Date(timeIntervalSince1970: maxTime)
+                }
+                // Reset zoom when data changes
+                visibleDateRange = nil
             } catch {
                 errorMessage = error.localizedDescription
                 chartSeries = []
+                fullDateRange = nil
+                visibleDateRange = nil
                 isLoading = false
             }
         }
-    }
-
-    /// Min-max decimation: preserves peaks and valleys by keeping min/max per bucket
-    /// Returns approximately targetPoints (can be up to 2x if data is small)
-    private func minMaxDecimate(timestamps: [Double], values: [Double], targetPoints: Int) -> [ChartPoint] {
-        let count = min(timestamps.count, values.count)
-        guard count > 0 else { return [] }
-
-        // If data is small enough, return all points
-        if count <= targetPoints {
-            return (0..<count).map { i in
-                ChartPoint(date: Date(timeIntervalSince1970: timestamps[i]), value: values[i])
-            }
-        }
-
-        // Each bucket produces 2 points (min and max), so use targetPoints/2 buckets
-        let bucketCount = targetPoints / 2
-        let bucketSize = Double(count) / Double(bucketCount)
-
-        var points: [ChartPoint] = []
-        points.reserveCapacity(targetPoints)
-
-        for bucket in 0..<bucketCount {
-            let startIdx = Int(Double(bucket) * bucketSize)
-            let endIdx = min(Int(Double(bucket + 1) * bucketSize), count)
-
-            guard startIdx < endIdx else { continue }
-
-            var minIdx = startIdx
-            var maxIdx = startIdx
-            var minVal = values[startIdx]
-            var maxVal = values[startIdx]
-
-            for i in startIdx..<endIdx {
-                if values[i] < minVal {
-                    minVal = values[i]
-                    minIdx = i
-                }
-                if values[i] > maxVal {
-                    maxVal = values[i]
-                    maxIdx = i
-                }
-            }
-
-            // Add min and max in time order to preserve visual continuity
-            if minIdx <= maxIdx {
-                points.append(ChartPoint(date: Date(timeIntervalSince1970: timestamps[minIdx]), value: minVal))
-                if minIdx != maxIdx {
-                    points.append(ChartPoint(date: Date(timeIntervalSince1970: timestamps[maxIdx]), value: maxVal))
-                }
-            } else {
-                points.append(ChartPoint(date: Date(timeIntervalSince1970: timestamps[maxIdx]), value: maxVal))
-                points.append(ChartPoint(date: Date(timeIntervalSince1970: timestamps[minIdx]), value: minVal))
-            }
-        }
-
-        return points
     }
 
     /// Get the color for a series by name, respecting custom colors and vector component hue shifts
@@ -416,20 +419,6 @@ struct TimeSeriesChartView: View {
             return (0..<min(count, 10)).map { "[\($0)]" }
         }
     }
-}
-
-// MARK: - Data Models
-
-struct ChartSeries: Identifiable {
-    let id = UUID()
-    let name: String
-    let points: [ChartPoint]
-}
-
-struct ChartPoint: Identifiable {
-    let id = UUID()
-    let date: Date
-    let value: Double
 }
 
 #Preview {
