@@ -63,8 +63,9 @@ struct CanvasLineChart: View {
 
         for s in series {
             for point in s.points {
-                // Only consider points in visible X range
-                if point.timestamp >= xRange.lowerBound.timeIntervalSince1970 &&
+                // Only consider finite points in visible X range
+                if point.value.isFinite &&
+                   point.timestamp >= xRange.lowerBound.timeIntervalSince1970 &&
                    point.timestamp <= xRange.upperBound.timeIntervalSince1970 {
                     minY = min(minY, point.value)
                     maxY = max(maxY, point.value)
@@ -183,29 +184,39 @@ struct CanvasLineChart: View {
         let xMin = xRange.lowerBound.timeIntervalSince1970
         let xMax = xRange.upperBound.timeIntervalSince1970
 
-        // Filter to visible points with small margin
+        // Filter to visible points with small margin, excluding NaN/infinite values
         let margin = (xMax - xMin) * 0.01
         let visiblePoints = series.points.filter { point in
-            point.timestamp >= (xMin - margin) && point.timestamp <= (xMax + margin)
+            point.timestamp >= (xMin - margin) && point.timestamp <= (xMax + margin) &&
+            point.value.isFinite
         }
 
         guard visiblePoints.count >= 2 else { return }
 
-        // Build path
+        // Build path, handling gaps from filtered NaN values
         var path = Path()
-        var started = false
+        var lastTimestamp: Double?
 
         for point in visiblePoints {
             let x = timestampToPixel(point.timestamp, in: plotRect, xMin: xMin, xMax: xMax)
             let y = yToPixel(point.value, in: plotRect, yRange: yRange)
             let cgPoint = CGPoint(x: x, y: y)
 
-            if !started {
+            // Check for data gap (more than 2x average spacing suggests missing data)
+            let isGap: Bool
+            if let last = lastTimestamp, visiblePoints.count > 1 {
+                let avgSpacing = (xMax - xMin) / Double(visiblePoints.count)
+                isGap = (point.timestamp - last) > avgSpacing * 3
+            } else {
+                isGap = false
+            }
+
+            if path.isEmpty || isGap {
                 path.move(to: cgPoint)
-                started = true
             } else {
                 path.addLine(to: cgPoint)
             }
+            lastTimestamp = point.timestamp
         }
 
         context.stroke(path, with: .color(color), lineWidth: 1)

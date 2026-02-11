@@ -5,6 +5,19 @@ All notable changes to CDF Viewer will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0] - 2025-02-11
+
+### Changed
+
+- Replace Swift Charts with Canvas-based rendering for 60fps chart performance
+- Chart now renders full-resolution data (no decimation artifacts)
+
+### Fixed
+
+- Chart correctly handles NaN/infinite values and data gaps
+- Decompression buffer too small for highly compressible CDF data
+- Table cell reuse bugs causing wrong colors and alignment
+
 ## [0.4.4] - 2025-02-10
 
 ### Added
