@@ -166,6 +166,27 @@ VStack {
 .clipped()
 ```
 
+**Text opacity in animated views**: When animating opacity on views containing text, the text can render semi-transparent even at full opacity due to how SwiftUI composites the animation. Fix with `.compositingGroup()` to rasterize the view before applying opacity:
+
+```swift
+HStack {
+    Circle().fill(color)
+    Text("Label")
+        .foregroundColor(Color(nsColor: .labelColor))  // Use explicit color
+}
+.compositingGroup()  // Rasterize before opacity animation
+.opacity(isVisible ? 1 : 0)
+.animation(.spring(), value: isVisible)
+```
+
+**SceneKit materials don't auto-update from SwiftUI**: When using SceneKit views inside SwiftUI with an `@Observable` view model, changes to view model properties don't automatically update SceneKit node materials. You must add `.onChange` observers and manually update materials:
+
+```swift
+.onChange(of: viewModel.variableOverrides) { _, _ in
+    updateNodeColors()  // Manually update SCNMaterial.diffuse.contents
+}
+```
+
 ## Unified Sidebar (NavigationSidebarContainer)
 
 **All three views use NavigationSidebarContainer for consistent sidebar styling.** The sidebar toggle uses a pure SwiftUI approach that's iPad-compatible.
