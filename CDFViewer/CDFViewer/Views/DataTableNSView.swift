@@ -165,6 +165,7 @@ struct DataTableNSView: NSViewRepresentable {
         }
 
         func tableViewSelectionDidChange(_ notification: Notification) {
+            // Only handle keyboard navigation here; mouse clicks are handled in handleRowClick
             guard !isUpdatingSelection, let tableView = tableView else { return }
             let selectedRow = tableView.selectedRow
             if selectedRow >= 0 {
@@ -185,9 +186,20 @@ struct DataTableNSView: NSViewRepresentable {
         }
 
         func handleRowClick(row: Int) {
-            if viewModel.isCursorPaused && viewModel.cursorIndex == row {
+            // Prevent tableViewSelectionDidChange from interfering
+            isUpdatingSelection = true
+            defer {
+                // Reset after a short delay to catch async selection change notification
+                DispatchQueue.main.async { [weak self] in
+                    self?.isUpdatingSelection = false
+                }
+            }
+
+            if viewModel.isCursorPaused {
+                // If already paused, any click unpauses (returns to hover mode)
                 viewModel.isCursorPaused = false
             } else {
+                // If not paused, click pauses at this row
                 viewModel.cursorIndex = row
                 viewModel.isCursorPaused = true
             }
