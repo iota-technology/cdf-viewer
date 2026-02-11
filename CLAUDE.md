@@ -222,6 +222,17 @@ var body: some View {
 - Forget `.toolbar(removing: .sidebarToggle)` (causes duplicate buttons)
 - Forget `.toolbarBackground(.hidden, for: .windowToolbar)` (breaks Liquid Glass)
 
+## Product Requirements
+
+**Keep `/requirements/` updated.** This directory contains markdown files documenting what we're building and why.
+
+- One file per feature (e.g., `variable-colors.md`, `globe-view.md`)
+- Include: purpose, design decisions, user-facing behavior
+- Update when adding features or changing behavior
+- Ask questions to understand user motivations when unclear
+
+**Always ask** when you need context on the "why" behind a feature. Understanding motivations leads to better design decisions and more useful requirements docs.
+
 ## CLAUDE.md Maintenance
 
 **Keep this file lean.** Only include:
