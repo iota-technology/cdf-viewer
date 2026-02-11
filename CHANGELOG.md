@@ -5,6 +5,14 @@ All notable changes to CDF Viewer will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0] - 2025-02-11
+
+### Added
+
+- Human-readable unit names on chart Y-axis (e.g., "Meters (m)" instead of just "m")
+- UnitNames mapping for common scientific units (m, km, m/s, rad/s, A, V, etc.)
+- Units displayed in parentheses in table column headers and sidebar
+
 ## [0.7.1] - 2025-02-11
 
 ### Performance

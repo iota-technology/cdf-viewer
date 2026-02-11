@@ -140,7 +140,9 @@ struct TimeSeriesChartView: View {
         }
 
         // Only return units if all selected variables have the same units
-        return units.count == 1 ? units.first : nil
+        // Format with human-readable name: "Meters (m)"
+        guard units.count == 1, let unit = units.first else { return nil }
+        return UnitNames.displayName(for: unit)
     }
 
     @ViewBuilder
