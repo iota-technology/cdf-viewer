@@ -13,12 +13,31 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     /// Globe windows keyed by viewModel
     var globeWindows: [ObjectIdentifier: NSWindow] = [:]
 
+    /// Reference to the welcome window for programmatic control
+    private weak var welcomeWindow: NSWindow?
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Register for auxiliary window notifications
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(handleOpenAuxiliaryWindow(_:)),
             name: .openAuxiliaryWindow,
+            object: nil
+        )
+
+        // Observe when windows become visible to close welcome window
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(windowDidBecomeKey(_:)),
+            name: NSWindow.didBecomeKeyNotification,
+            object: nil
+        )
+
+        // Observe when all document windows close to show welcome window
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(windowWillClose(_:)),
+            name: NSWindow.willCloseNotification,
             object: nil
         )
     }
@@ -37,6 +56,55 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             NSDocumentController.shared.openDocument(nil)
         }
         return true
+    }
+
+    // MARK: - Welcome Window Management
+
+    @objc private func windowDidBecomeKey(_ notification: Notification) {
+        guard let window = notification.object as? NSWindow else { return }
+
+        // If a document window became key, close the welcome window
+        if window.windowController?.document is CDFNSDocument {
+            closeWelcomeWindow()
+        }
+
+        // Track the welcome window for later reference
+        if window.identifier?.rawValue.contains("welcome") == true {
+            welcomeWindow = window
+        }
+    }
+
+    @objc private func windowWillClose(_ notification: Notification) {
+        guard let window = notification.object as? NSWindow else { return }
+
+        // If a document window is closing, check if we need to quit the app
+        if window.windowController?.document is CDFNSDocument {
+            // Delay check to allow window to fully close
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+                self?.showWelcomeWindowIfNeeded()
+            }
+        }
+    }
+
+    private func closeWelcomeWindow() {
+        // Find and close all welcome windows
+        for window in NSApp.windows where window.identifier?.rawValue.contains("welcome") == true {
+            window.close()
+        }
+    }
+
+    private func showWelcomeWindowIfNeeded() {
+        // Check if any document windows are still open
+        let hasDocumentWindows = NSDocumentController.shared.documents.contains { document in
+            document.windowControllers.contains { $0.window?.isVisible == true }
+        }
+
+        if !hasDocumentWindows {
+            // No document windows open, show welcome window if it exists
+            if let window = welcomeWindow {
+                window.makeKeyAndOrderFront(nil)
+            }
+        }
     }
 
     // MARK: - Auxiliary Windows
