@@ -3,17 +3,6 @@ import SwiftUI
 struct VariableListView: View {
     @Bindable var viewModel: CDFViewModel
 
-    /// Get color for a variable (only show for selected variables)
-    private func colorForVariable(_ name: String) -> Color? {
-        // Only show color if this variable/component is selected
-        guard viewModel.tableSelectedComponents.contains(name) ||
-              viewModel.tableSelectedComponents.contains(where: { $0.hasPrefix(name + ".") }) else {
-            return nil
-        }
-        // Use ViewModel's color which is deterministic based on variable name
-        return viewModel.colorFor(name, index: 0, palette: chartColorPalette)
-    }
-
     private var sidebarSections: [VariableSectionConfig] {
         guard let file = viewModel.cdfFile else { return [] }
         return [
@@ -37,7 +26,6 @@ struct VariableListView: View {
                 multiSelection: $viewModel.tableSelectedComponents,
                 sections: sidebarSections,
                 showDataTypeInfo: true,
-                colorForKey: colorForVariable,
                 loadingKeys: viewModel.loadingComponents,
                 viewModel: viewModel,
                 showPositionalToggle: false
