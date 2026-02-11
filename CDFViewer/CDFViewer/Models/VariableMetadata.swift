@@ -198,13 +198,88 @@ extension Color {
 // MARK: - Component Color Calculation
 
 extension VariableMetadata {
-    /// Get colors for vector components (X, Y, Z) based on base color
-    /// X uses the base color as-is; Y and Z preserve L/C but shift hue by 30°/60°
+    /// Get colors for vector components (X, Y, Z) based on base color.
+    /// Uses an adaptive LCH algorithm that handles edge cases:
+    /// - Low chroma (near gray): adds chroma to create visible color differences
+    /// - High chroma: shifts hue while preserving saturation
+    /// - Dark colors: lightens subsequent components for visibility
+    /// - Light colors: darkens subsequent components for visibility
     static func componentColors(for baseColor: Color) -> (x: Color, y: Color, z: Color) {
+        let variants = generateColorVariants(from: baseColor, count: 3)
         return (
-            x: baseColor,
-            y: baseColor.lchHueShifted(by: 30),
-            z: baseColor.lchHueShifted(by: 60)
+            x: variants[0],
+            y: variants[1],
+            z: variants[2]
         )
+    }
+
+    /// Generate N visually distinct colors from a starting color using adaptive LCH adjustments.
+    /// - Parameters:
+    ///   - baseColor: The starting color (used as first variant)
+    ///   - count: Number of colors to generate (2-5 recommended)
+    /// - Returns: Array of colors starting with the base color
+    static func generateColorVariants(from baseColor: Color, count: Int) -> [Color] {
+        guard count > 0 else { return [] }
+        guard count > 1 else { return [baseColor] }
+
+        let (l, c, h) = baseColor.lchComponents
+        var colors: [Color] = [baseColor]
+
+        // Determine adjustments based on base color characteristics
+        let isLowChroma = c < 15
+        let isDark = l < 30
+        let isLight = l > 70
+
+        for i in 1..<count {
+            let step = Double(i)
+
+            // Calculate hue shift (alternating directions for better spread)
+            let hueDirection = i.isMultiple(of: 2) ? 1.0 : -1.0
+            let hueShift: Double
+            if isLowChroma {
+                hueShift = hueDirection * 30.0 * step
+            } else {
+                // Use 30° base shift for good separation
+                hueShift = hueDirection * 30.0 * step
+            }
+
+            // Calculate chroma adjustment
+            var newChroma = c
+            if isLowChroma {
+                // Add significant chroma to make colors distinguishable from gray
+                newChroma = c + 25.0 * step
+            } else if isDark || isLight {
+                // For dark/light colors, also boost chroma to add color variety
+                newChroma = c + 15.0 * step
+            } else {
+                // Slight chroma variation (±10%)
+                let chromaVariation = i.isMultiple(of: 2) ? 0.9 : 1.1
+                newChroma = c * chromaVariation
+            }
+
+            // Calculate lightness adjustment
+            var newLightness = l
+            if isDark {
+                // Lighten subsequent colors significantly for visibility on dark backgrounds
+                newLightness = l + 28.0 * step
+            } else if isLight {
+                // Darken subsequent colors significantly for visibility on light backgrounds
+                newLightness = l - 28.0 * step
+            }
+
+            // Calculate new hue with wrapping
+            var newHue = h + hueShift
+            while newHue < 0 { newHue += 360 }
+            while newHue >= 360 { newHue -= 360 }
+
+            // Clamp values to valid ranges before creating color
+            newLightness = max(10, min(90, newLightness))
+            newChroma = max(0, min(130, newChroma))
+
+            // Create color and add (Color.lch already clamps to sRGB gamut)
+            colors.append(Color.lch(lightness: newLightness, chroma: newChroma, hue: newHue))
+        }
+
+        return colors
     }
 }
