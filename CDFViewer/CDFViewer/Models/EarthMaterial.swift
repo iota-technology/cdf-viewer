@@ -197,6 +197,38 @@ class EarthMaterial {
         let dir = sunDirection(for: date)
         return SCNVector3(dir.x * distance, dir.y * distance, dir.z * distance)
     }
+
+    // MARK: - Star Sphere Rotation
+
+    /// Calculates Greenwich Mean Sidereal Time (GMST) for star sphere rotation
+    /// Returns the rotation angle in radians around the Y-axis (Earth's rotation axis)
+    static func starSphereRotation(for date: Date) -> CGFloat {
+        // Calculate Julian Date
+        let j2000 = Date(timeIntervalSince1970: 946728000.0)  // Jan 1, 2000 12:00 UTC
+        let daysSinceJ2000 = date.timeIntervalSince(j2000) / 86400.0
+
+        // Calculate Julian centuries since J2000.0
+        let T = daysSinceJ2000 / 36525.0
+
+        // GMST at 0h UT in degrees (IAU 1982 formula)
+        // GMST = 280.46061837 + 360.98564736629 * d + 0.000387933 * T^2 - T^3 / 38710000
+        // where d = days since J2000.0 including fraction
+        var gmstDegrees = 280.46061837
+            + 360.98564736629 * daysSinceJ2000
+            + 0.000387933 * T * T
+            - T * T * T / 38710000.0
+
+        // Normalize to 0-360
+        gmstDegrees = gmstDegrees.truncatingRemainder(dividingBy: 360.0)
+        if gmstDegrees < 0 { gmstDegrees += 360.0 }
+
+        // Convert to radians
+        // The star sphere needs to rotate opposite to Earth's rotation
+        // (as Earth rotates east, stars appear to move west)
+        let gmstRadians = gmstDegrees * .pi / 180.0
+
+        return CGFloat(gmstRadians)
+    }
 }
 
 // MARK: - Day/Night Shader

@@ -39,6 +39,7 @@
 		A100003A000000000000003A /* blue_marble_11.jpg in Resources */ = {isa = PBXBuildFile; fileRef = A200003A000000000000003A /* blue_marble_11.jpg */; };
 		A100003B000000000000003B /* blue_marble_12.jpg in Resources */ = {isa = PBXBuildFile; fileRef = A200003B000000000000003B /* blue_marble_12.jpg */; };
 		A100003C000000000000003C /* black_marble.jpg in Resources */ = {isa = PBXBuildFile; fileRef = A200003C000000000000003C /* black_marble.jpg */; };
+		A100003D000000000000003D /* starmap_4k.jpg in Resources */ = {isa = PBXBuildFile; fileRef = A200003D000000000000003D /* starmap_4k.jpg */; };
 		A1000020000000000000001A /* VariableSidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000020000000000000001A /* VariableSidebarView.swift */; };
 		A1000021000000000000001B /* DataTableNSView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000021000000000000001B /* DataTableNSView.swift */; };
 		A1000022000000000000001C /* CDFNSDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000022000000000000001C /* CDFNSDocument.swift */; };
@@ -97,6 +98,7 @@
 		A200003A000000000000003A /* blue_marble_11.jpg */ = {isa = PBXFileReference; lastKnownFileType = image.jpeg; path = blue_marble_11.jpg; sourceTree = "<group>"; };
 		A200003B000000000000003B /* blue_marble_12.jpg */ = {isa = PBXFileReference; lastKnownFileType = image.jpeg; path = blue_marble_12.jpg; sourceTree = "<group>"; };
 		A200003C000000000000003C /* black_marble.jpg */ = {isa = PBXFileReference; lastKnownFileType = image.jpeg; path = black_marble.jpg; sourceTree = "<group>"; };
+		A200003D000000000000003D /* starmap_4k.jpg */ = {isa = PBXFileReference; lastKnownFileType = image.jpeg; path = starmap_4k.jpg; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -228,6 +230,7 @@
 				A200003A000000000000003A /* blue_marble_11.jpg */,
 				A200003B000000000000003B /* blue_marble_12.jpg */,
 				A200003C000000000000003C /* black_marble.jpg */,
+				A200003D000000000000003D /* starmap_4k.jpg */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -344,6 +347,7 @@
 				A100003A000000000000003A /* blue_marble_11.jpg in Resources */,
 				A100003B000000000000003B /* blue_marble_12.jpg in Resources */,
 				A100003C000000000000003C /* black_marble.jpg in Resources */,
+				A100003D000000000000003D /* starmap_4k.jpg in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

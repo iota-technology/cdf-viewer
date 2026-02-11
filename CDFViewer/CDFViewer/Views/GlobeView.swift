@@ -345,6 +345,32 @@ struct GlobeView: View {
         // Background
         newScene.background.contents = NSColor.black
 
+        // Star sphere - large sphere with star map texture on the inside
+        let starRadius: CGFloat = 500.0  // Very large, far behind everything
+        let starGeometry = SCNSphere(radius: starRadius)
+        starGeometry.segmentCount = 48  // Lower detail is fine for background
+
+        let starMaterial = SCNMaterial()
+        if let starTexture = Bundle.main.url(forResource: "starmap_4k", withExtension: "jpg"),
+           let starImage = NSImage(contentsOf: starTexture) {
+            starMaterial.emission.contents = starImage  // Emission so it glows without lighting
+            starMaterial.emission.intensity = 1.0
+        }
+        starMaterial.diffuse.contents = NSColor.black
+        starMaterial.lightingModel = .constant  // No lighting calculations needed
+        starMaterial.isDoubleSided = true  // Render on inside
+        starGeometry.materials = [starMaterial]
+
+        let starNode = SCNNode(geometry: starGeometry)
+        starNode.name = "stars"
+        // Flip scale to render texture on inside of sphere
+        starNode.scale = SCNVector3(-1, 1, 1)
+        // Set initial rotation based on sidereal time
+        let starDate = currentTimestamp ?? Date()
+        let starRotation = EarthMaterial.starSphereRotation(for: starDate)
+        starNode.eulerAngles = SCNVector3(0, starRotation, 0)
+        newScene.rootNode.addChildNode(starNode)
+
         // Earth sphere
         let earthRadius = earthRadiusKm * metersToSceneUnits * 1000
         let earthGeometry = SCNSphere(radius: CGFloat(earthRadius))
@@ -362,7 +388,7 @@ struct GlobeView: View {
         // Note: Globe centering in visible area is handled by the SceneView being in the detail area
         let cameraNode = SCNNode()
         cameraNode.camera = SCNCamera()
-        cameraNode.camera?.zFar = 1000
+        cameraNode.camera?.zFar = 600  // Must be > star sphere radius (500)
         cameraNode.position = SCNVector3(x: 0, y: 0, z: earthRadius * 3)
         cameraNode.name = "camera"
         newScene.rootNode.addChildNode(cameraNode)
@@ -602,7 +628,7 @@ struct GlobeView: View {
         gapIndices = []
     }
 
-    /// Updates sun light position and Earth material based on the current timestamp
+    /// Updates sun light position, star sphere rotation, and Earth material based on the current timestamp
     private func updateSunPosition(for date: Date?) {
         guard let scene = scene,
               let date = date else { return }
@@ -611,6 +637,14 @@ struct GlobeView: View {
         if let sunLight = scene.rootNode.childNode(withName: "sunLight", recursively: false) {
             sunLight.position = EarthMaterial.sunPosition(for: date)
             sunLight.look(at: SCNVector3(0, 0, 0))
+        }
+
+        // Update star sphere rotation based on sidereal time
+        if let starNode = scene.rootNode.childNode(withName: "stars", recursively: false) {
+            let rotation = EarthMaterial.starSphereRotation(for: date)
+            // Rotate around Y-axis (Earth's rotation axis in SceneKit coordinates)
+            // Negative X scale is preserved; we rotate around Y
+            starNode.eulerAngles = SCNVector3(0, rotation, 0)
         }
 
         // Update Earth material for seasonal blending

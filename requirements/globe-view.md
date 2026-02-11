@@ -68,3 +68,18 @@ Visualize satellite orbital position data on a 3D Earth globe with time-synchron
 - Warm yellow-orange tint (RGB: 1.0, 0.85, 0.5) for realistic city light appearance
 - Terminator transition: ~15° (0.26 radians) smooth fade using smoothstep
 - Day side dims to 2% ambient to prevent complete blackout while maintaining contrast
+
+### Star Background
+
+- Large sphere (radius 500) surrounding the scene with NASA star map texture
+- Texture from NASA SVS (svs.gsfc.nasa.gov/4851), converted from 8K EXR to 4K JPEG
+- Rendered on inside of sphere using negative X scale and emission-only material
+- Rotates based on Greenwich Mean Sidereal Time (GMST) for accurate star positions
+- Uses IAU 1982 formula: GMST = 280.46° + 360.985647° × days since J2000.0
+- Stars rotate ~1° more per day than the sun (sidereal day ≈ 23h 56m vs solar day 24h)
+
+### Orbit Track Gap Detection
+
+- Detects gaps in timestamp data (time delta > 3× median time step)
+- Gaps rendered as actual breaks in the track line, not straight lines
+- Prevents misleading visualization of data discontinuities
