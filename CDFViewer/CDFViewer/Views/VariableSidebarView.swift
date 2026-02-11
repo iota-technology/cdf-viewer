@@ -29,6 +29,9 @@ struct VariableSidebarView<TrailingContent: View>: View {
     /// Returns true if the variable should be disabled (greyed out, not selectable)
     var isDisabled: ((CDFVariable) -> Bool)?
 
+    /// Returns the reason a variable is disabled (for tooltip display)
+    var disabledReason: ((CDFVariable) -> String?)?
+
     /// Returns the color indicator for a component key (nil = no indicator)
     var colorForKey: ((String) -> Color?)?
 
@@ -287,6 +290,7 @@ struct VariableSidebarView<TrailingContent: View>: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 6)
             .contentShape(Rectangle())
+            .help(disabled ? (disabledReason?(variable) ?? "") : "")
             .onTapGesture {
                 guard !disabled else { return }
                 toggleVariable(variable, expanded: shouldExpand)
@@ -458,6 +462,7 @@ extension VariableSidebarView where TrailingContent == EmptyView {
         selection: Binding<CDFVariable?>,
         showDataTypeInfo: Bool = true,
         isDisabled: ((CDFVariable) -> Bool)? = nil,
+        disabledReason: ((CDFVariable) -> String?)? = nil,
         loadingKeys: Set<String> = [],
         viewModel: CDFViewModel? = nil,
         showPositionalToggle: Bool = false,
@@ -471,6 +476,7 @@ extension VariableSidebarView where TrailingContent == EmptyView {
         self.showDataTypeInfo = showDataTypeInfo
         self.expandVectors = true
         self.isDisabled = isDisabled
+        self.disabledReason = disabledReason
         self.loadingKeys = loadingKeys
         self.viewModel = viewModel
         self.showPositionalToggle = showPositionalToggle
@@ -486,6 +492,7 @@ extension VariableSidebarView where TrailingContent == EmptyView {
         showDataTypeInfo: Bool = true,
         expandVectors: Bool = true,
         isDisabled: ((CDFVariable) -> Bool)? = nil,
+        disabledReason: ((CDFVariable) -> String?)? = nil,
         colorForKey: ((String) -> Color?)? = nil,
         valueForKey: ((String) -> Double?)? = nil,
         loadingKeys: Set<String> = [],
@@ -499,6 +506,7 @@ extension VariableSidebarView where TrailingContent == EmptyView {
         self.showDataTypeInfo = showDataTypeInfo
         self.expandVectors = expandVectors
         self.isDisabled = isDisabled
+        self.disabledReason = disabledReason
         self.colorForKey = colorForKey
         self.valueForKey = valueForKey
         self.loadingKeys = loadingKeys
@@ -518,6 +526,7 @@ extension VariableSidebarView {
         showDataTypeInfo: Bool = true,
         expandVectors: Bool = true,
         isDisabled: ((CDFVariable) -> Bool)? = nil,
+        disabledReason: ((CDFVariable) -> String?)? = nil,
         colorForKey: ((String) -> Color?)? = nil,
         valueForKey: ((String) -> Double?)? = nil,
         loadingKeys: Set<String> = [],
@@ -532,6 +541,7 @@ extension VariableSidebarView {
         self.showDataTypeInfo = showDataTypeInfo
         self.expandVectors = expandVectors
         self.isDisabled = isDisabled
+        self.disabledReason = disabledReason
         self.colorForKey = colorForKey
         self.valueForKey = valueForKey
         self.loadingKeys = loadingKeys

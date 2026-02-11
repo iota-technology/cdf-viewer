@@ -178,6 +178,21 @@ struct GlobeView: View {
                 !viewModel.isPositional(variable) &&
                 !(viewModel.cdfFile?.timestampVariables().contains(where: { $0.name == variable.name }) ?? false)
             },
+            disabledReason: { variable in
+                // Time variables are never disabled, no reason needed
+                if viewModel.cdfFile?.timestampVariables().contains(where: { $0.name == variable.name }) ?? false {
+                    return nil
+                }
+                // Non-3vecs can't be positions
+                if !variable.isVector {
+                    return "This variable is not interpretable as a geocentric position."
+                }
+                // 3-vecs that aren't marked as positional
+                if !viewModel.isPositional(variable) {
+                    return "This variable has not been selected as a geocentric position. This can be toggled in the variable's info pane."
+                }
+                return nil
+            },
             colorForKey: trackColor,
             viewModel: viewModel,
             showPositionalToggle: true,

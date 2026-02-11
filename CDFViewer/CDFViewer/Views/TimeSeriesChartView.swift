@@ -56,6 +56,8 @@ struct TimeSeriesChartView: View {
             multiSelection: $selectedComponents,
             sections: sidebarSections,
             showDataTypeInfo: true,
+            isDisabled: isVariableDisabled,
+            disabledReason: disabledReason,
             colorForKey: seriesColor,
             valueForKey: getCurrentValue,
             viewModel: viewModel,
@@ -125,8 +127,8 @@ struct TimeSeriesChartView: View {
         visibleDateRange != nil
     }
 
-    /// Common units for the Y-axis label (if all selected variables have the same units)
-    private var yAxisUnits: String? {
+    /// The unit of currently selected variables (nil if none selected or mixed units)
+    private var selectedUnit: String? {
         guard let file = viewModel.cdfFile else { return nil }
 
         var units: Set<String> = []
@@ -139,10 +141,56 @@ struct TimeSeriesChartView: View {
             }
         }
 
-        // Only return units if all selected variables have the same units
-        // Format with human-readable name: "Meters (m)"
+        // Return the unit if all selected variables have the same unit
         guard units.count == 1, let unit = units.first else { return nil }
+        return unit
+    }
+
+    /// Common units for the Y-axis label (if all selected variables have the same units)
+    private var yAxisUnits: String? {
+        guard let unit = selectedUnit else { return nil }
         return UnitNames.displayName(for: unit)
+    }
+
+    /// Check if a variable is disabled due to unit mismatch
+    private func isVariableDisabled(_ variable: CDFVariable) -> Bool {
+        // If nothing selected, all variables are enabled
+        guard !selectedComponents.isEmpty else { return false }
+
+        // If we have a selected unit, disable variables with different units
+        if let requiredUnit = selectedUnit {
+            let varUnit = variable.units ?? ""
+            return varUnit != requiredUnit
+        }
+
+        // If selected variables have no units, disable variables that DO have units
+        // (prevents mixing unitless with unit-having)
+        if let file = viewModel.cdfFile {
+            let selectedHaveNoUnits = selectedComponents.allSatisfy { key in
+                let varName = key.contains(".") ? String(key.split(separator: ".")[0]) : key
+                if let v = file.variables.first(where: { $0.name == varName }) {
+                    return v.units == nil || v.units?.isEmpty == true
+                }
+                return true
+            }
+            if selectedHaveNoUnits {
+                return variable.units != nil && !variable.units!.isEmpty
+            }
+        }
+
+        return false
+    }
+
+    /// Get the reason why a variable is disabled
+    private func disabledReason(for variable: CDFVariable) -> String? {
+        guard isVariableDisabled(variable) else { return nil }
+
+        if let requiredUnit = selectedUnit {
+            let displayUnit = UnitNames.displayName(for: requiredUnit)
+            return "This variable is not in \(displayUnit). Deselect other variables first to chart this one."
+        }
+
+        return "This variable has different units than selected variables. Deselect other variables first to chart this one."
     }
 
     @ViewBuilder
