@@ -196,9 +196,16 @@ struct TimeSeriesChartView: View {
     // MARK: - Value Display
 
     private func getCurrentValue(for key: String) -> Double? {
-        // Use viewModel's index-based access for accurate values (not decimated chart data)
-        guard let index = viewModel.cursorIndex else { return nil }
-        return viewModel.value(column: key, at: index)
+        // Only show values for selected components
+        guard selectedComponents.contains(key) else { return nil }
+        // Find the series with this name
+        guard let series = chartSeries.first(where: { $0.name == key }),
+              let cursorDate = viewModel.cursorDate else { return nil }
+        // Find the closest point to the cursor date
+        guard let closest = series.points.min(by: {
+            abs($0.date.timeIntervalSince(cursorDate)) < abs($1.date.timeIntervalSince(cursorDate))
+        }) else { return nil }
+        return closest.value
     }
 
     // MARK: - Data Loading
@@ -355,11 +362,20 @@ struct TimeSeriesChartView: View {
     }
 
     /// Get the color for a series by name, respecting custom colors and vector component hue shifts
+    /// Only returns a color if the variable/component is selected
     private func seriesColor(for name: String) -> Color? {
-        guard let index = chartSeries.firstIndex(where: { $0.name == name }) else {
-            return nil
+        // Only show color indicator if this item is selected
+        let isSelected = selectedComponents.contains(name) ||
+                         selectedComponents.contains(where: { $0.hasPrefix(name + ".") })
+        guard isSelected else { return nil }
+
+        // Try exact match first (for scalar variables or component keys)
+        if let index = chartSeries.firstIndex(where: { $0.name == name }) {
+            return colorForSeries(name: name, index: index)
         }
-        return colorForSeries(name: name, index: index)
+        // For base variable names (e.g., "VarName" when chartSeries has "VarName.X"),
+        // return the base color from the ViewModel
+        return viewModel.colorFor(name, index: 0, palette: chartColorPalette)
     }
 
     /// Get color for a series, handling both scalar variables and vector components

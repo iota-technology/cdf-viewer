@@ -5,14 +5,15 @@ struct VariableInfoPopover: View {
     let variable: CDFVariable
     var viewModel: CDFViewModel
     let showPositionalToggle: Bool
-    let defaultColor: Color
+    /// The default color to show (nil = don't show color picker at all)
+    let defaultColor: Color?
 
     @State private var selectedColor: Color = .blue
     @State private var isPositional: Bool = false
     @State private var isHoveringColor: Bool = false
     @State private var hoverDismissTask: DispatchWorkItem?
 
-    init(variable: CDFVariable, viewModel: CDFViewModel, showPositionalToggle: Bool = false, defaultColor: Color = .blue) {
+    init(variable: CDFVariable, viewModel: CDFViewModel, showPositionalToggle: Bool = false, defaultColor: Color? = nil) {
         self.variable = variable
         self.viewModel = viewModel
         self.showPositionalToggle = showPositionalToggle
@@ -25,14 +26,16 @@ struct VariableInfoPopover: View {
         // Use custom color if set, otherwise use the default color passed in
         if let hexColor = metadata.customColor, let color = Color(hex: hexColor) {
             _selectedColor = State(initialValue: color)
+        } else if let color = defaultColor {
+            _selectedColor = State(initialValue: color)
         } else {
-            _selectedColor = State(initialValue: defaultColor)
+            _selectedColor = State(initialValue: .blue)
         }
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            // Header with color picker
+            // Header with optional color picker
             HStack {
                 Text(variable.name)
                     .font(.headline)
@@ -40,8 +43,10 @@ struct VariableInfoPopover: View {
 
                 Spacer()
 
-                // Color picker with sub-colors overlay for vectors
-                colorPickerWithSubColors
+                // Color picker with sub-colors overlay for vectors (only when color is used)
+                if defaultColor != nil {
+                    colorPickerWithSubColors
+                }
             }
 
             Divider()
@@ -151,10 +156,11 @@ struct VariableInfoPopover: View {
                 .fill(color)
                 .frame(width: 10, height: 10)
             Text(label)
-                .foregroundStyle(.secondary)
+                .foregroundColor(Color(nsColor: .labelColor))
                 .font(.caption)
         }
         .frame(height: componentRowHeight)
+        .compositingGroup()  // Rasterize before applying opacity to fix text rendering
         // Each row slides out from directly under the one above (just one row height)
         .offset(y: isHoveringColor ? 0 : -componentRowHeight)
         .opacity(isHoveringColor ? 1 : 0)

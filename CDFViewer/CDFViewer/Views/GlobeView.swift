@@ -156,11 +156,13 @@ struct GlobeView: View {
     }
 
     /// Get track color by variable name (for sidebar indicator)
+    /// Only returns a color if the variable is selected
     private func trackColor(for name: String) -> Color? {
-        guard let index = Array(selectedPositionVariables.sorted()).firstIndex(of: name) else {
-            return nil
-        }
-        // Use custom color from metadata if set, otherwise use palette
+        // Only show color indicator if this variable is selected
+        guard selectedPositionVariables.contains(name) else { return nil }
+        let sortedVars = Array(selectedPositionVariables.sorted())
+        let index = sortedVars.firstIndex(of: name) ?? 0
+        // Use custom color from metadata if set, otherwise use default color for variable
         return viewModel.colorFor(name, index: index, palette: trackColorPalette)
     }
 

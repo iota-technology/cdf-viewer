@@ -389,12 +389,27 @@ final class CDFViewModel {
     }
 
     /// Get color for a variable, respecting user override
+    /// Default colors use deterministic random hues at fixed L=65, C=60 for visual consistency
     func colorFor(_ variableName: String, index: Int, palette: [Color]) -> Color {
         if let hex = variableOverrides[variableName]?.customColor,
            let color = Color(hex: hex) {
             return color
         }
-        return palette[index % palette.count]
+        return defaultColor(for: variableName)
+    }
+
+    /// Generate a deterministic "random" color for a variable based on its name
+    /// Uses fixed L=65 and C=60 with a hue derived from hashing the variable name
+    private func defaultColor(for variableName: String) -> Color {
+        // Use a simple hash of the variable name to get a deterministic hue
+        var hash: UInt64 = 5381
+        for char in variableName.utf8 {
+            hash = ((hash << 5) &+ hash) &+ UInt64(char)
+        }
+        // Map hash to hue (0-360)
+        let hue = Double(hash % 360)
+        // Fixed lightness and chroma for good visibility
+        return Color.lch(lightness: 65, chroma: 60, hue: hue)
     }
 
     /// Get metadata for a variable (creates default if not exists)

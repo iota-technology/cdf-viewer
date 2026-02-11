@@ -161,7 +161,7 @@ struct VariableSidebarView<TrailingContent: View>: View {
                             variable: variable,
                             viewModel: vm,
                             showPositionalToggle: showPositionalToggle,
-                            defaultColor: colorForKey?(variable.name) ?? .blue
+                            defaultColor: colorForKey?(variable.name)
                         )
                     }
                 }
@@ -262,7 +262,7 @@ struct VariableSidebarView<TrailingContent: View>: View {
                                 variable: variable,
                                 viewModel: vm,
                                 showPositionalToggle: showPositionalToggle,
-                                defaultColor: colorForKey?(variable.name) ?? .blue
+                                defaultColor: colorForKey?(variable.name)
                             )
                         }
                     }

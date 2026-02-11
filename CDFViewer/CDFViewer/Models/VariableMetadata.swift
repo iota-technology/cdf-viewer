@@ -159,7 +159,7 @@ extension Color {
         g = max(0, min(1, g))
         bl = max(0, min(1, bl))
 
-        return Color(red: r, green: g, blue: bl)
+        return Color(red: r, green: g, blue: bl, opacity: 1.0)
     }
 
     /// Create an LCH color variant preserving this color's L and C, but shifting H
