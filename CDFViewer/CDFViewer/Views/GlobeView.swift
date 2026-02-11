@@ -237,13 +237,6 @@ struct GlobeView: View {
                                 .buttonStyle(.plain)
                                 .foregroundStyle(.white)
 
-                                // Pause indicator (synced with table/chart)
-                                if viewModel.isCursorPaused && !isAnimating {
-                                    Image(systemName: "pause.circle.fill")
-                                        .font(.caption)
-                                        .foregroundStyle(.orange)
-                                }
-
                                 // Scrubber slider - bound to shared cursor progress
                                 Slider(value: $viewModel.cursorProgress, in: 0...1)
                                     .tint(viewModel.isCursorPaused ? .orange : .white)
