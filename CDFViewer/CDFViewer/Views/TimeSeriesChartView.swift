@@ -164,9 +164,56 @@ struct TimeSeriesChartView: View {
         return UnitNames.displayName(for: unit)
     }
 
-    /// Check if a variable is disabled due to unit mismatch
+    // MARK: - Variable Association Helpers
+
+    /// Get the DEPEND_0 attribute (primary time dependency) for a variable
+    private func timeVariableName(for variable: CDFVariable) -> String? {
+        variable.attributes["DEPEND_0"]
+    }
+
+    /// Check if a time variable is associated with any of the selected data variables
+    private func isTimeVariableAssociatedWithSelection(_ timeVar: CDFVariable) -> Bool {
+        guard let file = viewModel.cdfFile else { return false }
+
+        // Check if any selected data variable depends on this time variable
+        for key in selectedComponents {
+            let varName = key.contains(".") ? String(key.split(separator: ".")[0]) : key
+            if let dataVar = file.variables.first(where: { $0.name == varName }) {
+                // If DEPEND_0 is not set, treat as compatible with any time variable
+                guard let dependsOn = timeVariableName(for: dataVar) else { return true }
+                if dependsOn == timeVar.name {
+                    return true
+                }
+            }
+        }
+        return false
+    }
+
+    /// Check if a data variable is associated with the selected time variable
+    private func isDataVariableAssociatedWithSelectedTime(_ dataVar: CDFVariable) -> Bool {
+        guard let selectedTime = selectedTimeVariable else { return true }  // No time selected = all enabled
+        // If DEPEND_0 is not set, treat as compatible with any time variable
+        guard let dependsOn = timeVariableName(for: dataVar) else { return true }
+        return dependsOn == selectedTime.name
+    }
+
+    /// Check if a variable is disabled (association check takes priority over unit check)
     private func isVariableDisabled(_ variable: CDFVariable) -> Bool {
-        // If nothing selected, all variables are enabled
+        // Time variable section
+        if variable.isTimestamp {
+            // If no data variables selected, all time variables are enabled
+            guard !selectedComponents.isEmpty else { return false }
+            // Only enable time variables associated with selected data variables
+            return !isTimeVariableAssociatedWithSelection(variable)
+        }
+
+        // Data variable section
+        // First check: association with selected time variable (takes priority)
+        if !isDataVariableAssociatedWithSelectedTime(variable) {
+            return true
+        }
+
+        // Second check: unit constraints (only if association check passes)
         guard !selectedComponents.isEmpty else { return false }
 
         // If we have a selected unit, disable variables with different units
@@ -176,7 +223,6 @@ struct TimeSeriesChartView: View {
         }
 
         // If selected variables have no units, disable variables that DO have units
-        // (prevents mixing unitless with unit-having)
         if let file = viewModel.cdfFile {
             let selectedHaveNoUnits = selectedComponents.allSatisfy { key in
                 let varName = key.contains(".") ? String(key.split(separator: ".")[0]) : key
@@ -197,6 +243,19 @@ struct TimeSeriesChartView: View {
     private func disabledReason(for variable: CDFVariable) -> String? {
         guard isVariableDisabled(variable) else { return nil }
 
+        // Time variable disabled reasons
+        if variable.isTimestamp {
+            return "This time variable is not associated with the selected data variables."
+        }
+
+        // Data variable disabled reasons - check association first (takes priority)
+        if !isDataVariableAssociatedWithSelectedTime(variable) {
+            if let selectedTime = selectedTimeVariable {
+                return "This variable is not associated with \(selectedTime.name). Select a different time variable to chart this."
+            }
+        }
+
+        // Unit mismatch reasons
         if let requiredUnit = selectedUnit {
             let displayUnit = UnitNames.displayName(for: requiredUnit)
             return "This variable is not in \(displayUnit). Deselect other variables first to chart this one."
