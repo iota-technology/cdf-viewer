@@ -5,6 +5,16 @@ All notable changes to CDF Viewer will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.0] - 2026-02-12
+
+### Added
+
+- QuickLook Preview extension for CDF files
+  - Shows file metadata (name, size, version, encoding)
+  - Displays full variable list with types, dimensions, and units
+  - Shows key global attributes (Project, Source, Mission, etc.)
+  - Two-column layout optimized for Finder preview
+
 ## [0.10.3] - 2026-02-12
 
 ### Added

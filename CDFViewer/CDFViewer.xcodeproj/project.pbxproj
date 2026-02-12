@@ -53,7 +53,41 @@
 		A100002A0000000000000024 /* EarthMaterial.swift in Sources */ = {isa = PBXBuildFile; fileRef = A200002A0000000000000024 /* EarthMaterial.swift */; };
 		A100002B0000000000000025 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = B10000010000000000000001 /* Sparkle */; };
 		A100002C0000000000000026 /* UpdaterController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A200002B0000000000000025 /* UpdaterController.swift */; };
+		C10000010000000000000001 /* PreviewViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000001 /* PreviewViewController.swift */; };
+		C10000020000000000000002 /* CDFPreviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000020000000000000002 /* CDFPreviewView.swift */; };
+		C10000030000000000000003 /* CDFReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000030000000000000003 /* CDFReader.swift */; };
+		C10000040000000000000004 /* CDFBinaryReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000040000000000000004 /* CDFBinaryReader.swift */; };
+		C10000050000000000000005 /* CDFRecords.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000050000000000000005 /* CDFRecords.swift */; };
+		C10000060000000000000006 /* CDFDataTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000060000000000000006 /* CDFDataTypes.swift */; };
+		C10000070000000000000007 /* CDFCompression.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000070000000000000007 /* CDFCompression.swift */; };
+		C10000080000000000000008 /* CDFVariable.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000090000000000000009 /* CDFVariable.swift */; };
+		C10000090000000000000009 /* CDFError.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000010000000000000000A /* CDFError.swift */; };
+		C1000010000000000000000A /* CDFQuickLook.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = C00000010000000000000001 /* CDFQuickLook.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		C3000001000000000000001 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A80000010000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = C50000010000000000000001;
+			remoteInfo = CDFQuickLook;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		C40000010000000000000001 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				C1000010000000000000000A /* CDFQuickLook.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		A00000010000000000000001 /* CDFViewer.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = CDFViewer.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -102,6 +136,10 @@
 		A200003B000000000000003B /* blue_marble_12.jpg */ = {isa = PBXFileReference; lastKnownFileType = image.jpeg; path = blue_marble_12.jpg; sourceTree = "<group>"; };
 		A200003C000000000000003C /* black_marble.jpg */ = {isa = PBXFileReference; lastKnownFileType = image.jpeg; path = black_marble.jpg; sourceTree = "<group>"; };
 		A200003D000000000000003D /* starmap_4k.jpg */ = {isa = PBXFileReference; lastKnownFileType = image.jpeg; path = starmap_4k.jpg; sourceTree = "<group>"; };
+		C00000010000000000000001 /* CDFQuickLook.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = CDFQuickLook.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		C20000010000000000000001 /* PreviewViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewViewController.swift; sourceTree = "<group>"; };
+		C20000020000000000000002 /* CDFPreviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CDFPreviewView.swift; sourceTree = "<group>"; };
+		C20000030000000000000003 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -113,6 +151,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		C30000020000000000000002 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -120,6 +165,7 @@
 			isa = PBXGroup;
 			children = (
 				A40000020000000000000002 /* CDFViewer */,
+				C4000002000000000000002 /* CDFQuickLook */,
 				A40000030000000000000003 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -150,6 +196,7 @@
 			isa = PBXGroup;
 			children = (
 				A00000010000000000000001 /* CDFViewer.app */,
+				C00000010000000000000001 /* CDFQuickLook.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -240,6 +287,16 @@
 			path = Resources;
 			sourceTree = "<group>";
 		};
+		C4000002000000000000002 /* CDFQuickLook */ = {
+			isa = PBXGroup;
+			children = (
+				C20000010000000000000001 /* PreviewViewController.swift */,
+				C20000020000000000000002 /* CDFPreviewView.swift */,
+				C20000030000000000000003 /* Info.plist */,
+			);
+			path = CDFQuickLook;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -251,10 +308,12 @@
 				A30000010000000000000001 /* Frameworks */,
 				A70000020000000000000002 /* Resources */,
 				A70000030000000000000003 /* Set Version from Git Tag */,
+				C40000010000000000000001 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				C5000002000000000000002 /* PBXTargetDependency */,
 			);
 			name = CDFViewer;
 			packageProductDependencies = (
@@ -263,6 +322,23 @@
 			productName = CDFViewer;
 			productReference = A00000010000000000000001 /* CDFViewer.app */;
 			productType = "com.apple.product-type.application";
+		};
+		C50000010000000000000001 /* CDFQuickLook */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C60000010000000000000001 /* Build configuration list for PBXNativeTarget "CDFQuickLook" */;
+			buildPhases = (
+				C70000010000000000000001 /* Sources */,
+				C30000020000000000000002 /* Frameworks */,
+				C70000020000000000000002 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = CDFQuickLook;
+			productName = CDFQuickLook;
+			productReference = C00000010000000000000001 /* CDFQuickLook.appex */;
+			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
 
@@ -275,6 +351,9 @@
 				LastUpgradeCheck = 1500;
 				TargetAttributes = {
 					A50000010000000000000001 = {
+						CreatedOnToolsVersion = 15.0;
+					};
+					C50000010000000000000001 = {
 						CreatedOnToolsVersion = 15.0;
 					};
 				};
@@ -296,6 +375,7 @@
 			projectRoot = "";
 			targets = (
 				A50000010000000000000001 /* CDFViewer */,
+				C50000010000000000000001 /* CDFQuickLook */,
 			);
 		};
 /* End PBXProject section */
@@ -337,6 +417,22 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		C70000010000000000000001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				C10000010000000000000001 /* PreviewViewController.swift in Sources */,
+				C10000020000000000000002 /* CDFPreviewView.swift in Sources */,
+				C10000030000000000000003 /* CDFReader.swift in Sources */,
+				C10000040000000000000004 /* CDFBinaryReader.swift in Sources */,
+				C10000050000000000000005 /* CDFRecords.swift in Sources */,
+				C10000060000000000000006 /* CDFDataTypes.swift in Sources */,
+				C10000070000000000000007 /* CDFCompression.swift in Sources */,
+				C10000080000000000000008 /* CDFVariable.swift in Sources */,
+				C10000090000000000000009 /* CDFError.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXResourcesBuildPhase section */
@@ -363,6 +459,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		C70000020000000000000002 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXShellScriptBuildPhase section */
@@ -381,6 +484,14 @@
 			shellScript = "# Get version from latest git tag (strips 'v' prefix)\nVERSION=$(git describe --tags --abbrev=0 2>/dev/null | sed 's/^v//')\nif [ -z \"$VERSION\" ]; then\n    VERSION=\"0.0.0-dev\"\nfi\n\n# Get short git SHA for build number\nGIT_SHA=$(git rev-parse --short HEAD 2>/dev/null)\nif [ -z \"$GIT_SHA\" ]; then\n    GIT_SHA=\"unknown\"\nfi\n\nPLIST=\"${TARGET_BUILD_DIR}/${INFOPLIST_PATH}\"\n\n# Update version (delete first to handle both add/update cases)\n/usr/libexec/PlistBuddy -c \"Delete :CFBundleShortVersionString\" \"$PLIST\" 2>/dev/null || true\n/usr/libexec/PlistBuddy -c \"Add :CFBundleShortVersionString string $VERSION\" \"$PLIST\"\n\n# Update build number\n/usr/libexec/PlistBuddy -c \"Delete :CFBundleVersion\" \"$PLIST\" 2>/dev/null || true\n/usr/libexec/PlistBuddy -c \"Add :CFBundleVersion string $GIT_SHA\" \"$PLIST\"\n";
 		};
 /* End PBXShellScriptBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		C5000002000000000000002 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = C50000010000000000000001 /* CDFQuickLook */;
+			targetProxy = C3000001000000000000001 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		A90000010000000000000001 /* Debug */ = {
@@ -555,6 +666,54 @@
 			};
 			name = Release;
 		};
+		C90000010000000000000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = CDFQuickLook/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = CDFQuickLook;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "Iota Technology";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MARKETING_VERSION = 0.4.4;
+				PRODUCT_BUNDLE_IDENTIFIER = com.iotatechnology.CDFViewer.CDFQuickLook;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		C90000020000000000000002 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = CDFQuickLook/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = CDFQuickLook;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "Iota Technology";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MARKETING_VERSION = 0.4.4;
+				PRODUCT_BUNDLE_IDENTIFIER = com.iotatechnology.CDFViewer.CDFQuickLook;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -572,6 +731,15 @@
 			buildConfigurations = (
 				A90000010000000000000001 /* Debug */,
 				A90000020000000000000002 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		C60000010000000000000001 /* Build configuration list for PBXNativeTarget "CDFQuickLook" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C90000010000000000000001 /* Debug */,
+				C90000020000000000000002 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
