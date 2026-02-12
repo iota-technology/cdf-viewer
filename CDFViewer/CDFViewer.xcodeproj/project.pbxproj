@@ -51,6 +51,8 @@
 		A10000280000000000000022 /* CanvasLineChart.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000280000000000000022 /* CanvasLineChart.swift */; };
 		A10000290000000000000023 /* UnitNames.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000290000000000000023 /* UnitNames.swift */; };
 		A100002A0000000000000024 /* EarthMaterial.swift in Sources */ = {isa = PBXBuildFile; fileRef = A200002A0000000000000024 /* EarthMaterial.swift */; };
+		A100002B0000000000000025 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = B10000010000000000000001 /* Sparkle */; };
+		A100002C0000000000000026 /* UpdaterController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A200002B0000000000000025 /* UpdaterController.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -85,6 +87,7 @@
 		A20000280000000000000022 /* CanvasLineChart.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasLineChart.swift; sourceTree = "<group>"; };
 		A20000290000000000000023 /* UnitNames.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UnitNames.swift; sourceTree = "<group>"; };
 		A200002A0000000000000024 /* EarthMaterial.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EarthMaterial.swift; sourceTree = "<group>"; };
+		A200002B0000000000000025 /* UpdaterController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdaterController.swift; sourceTree = "<group>"; };
 		A20000300000000000000030 /* blue_marble_01.jpg */ = {isa = PBXFileReference; lastKnownFileType = image.jpeg; path = blue_marble_01.jpg; sourceTree = "<group>"; };
 		A20000310000000000000031 /* blue_marble_02.jpg */ = {isa = PBXFileReference; lastKnownFileType = image.jpeg; path = blue_marble_02.jpg; sourceTree = "<group>"; };
 		A20000320000000000000032 /* blue_marble_03.jpg */ = {isa = PBXFileReference; lastKnownFileType = image.jpeg; path = blue_marble_03.jpg; sourceTree = "<group>"; };
@@ -106,6 +109,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A100002B0000000000000025 /* Sparkle in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -182,6 +186,7 @@
 				A2000025000000000000001F /* VariableMetadata.swift */,
 				A20000290000000000000023 /* UnitNames.swift */,
 				A200002A0000000000000024 /* EarthMaterial.swift */,
+				A200002B0000000000000025 /* UpdaterController.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -252,6 +257,9 @@
 			dependencies = (
 			);
 			name = CDFViewer;
+			packageProductDependencies = (
+				B10000010000000000000001 /* Sparkle */,
+			);
 			productName = CDFViewer;
 			productReference = A00000010000000000000001 /* CDFViewer.app */;
 			productType = "com.apple.product-type.application";
@@ -280,6 +288,9 @@
 				Base,
 			);
 			mainGroup = A40000010000000000000001;
+			packageReferences = (
+				B00000010000000000000001 /* XCRemoteSwiftPackageReference "Sparkle" */,
+			);
 			productRefGroup = A40000030000000000000003 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -322,6 +333,7 @@
 				A10000280000000000000022 /* CanvasLineChart.swift in Sources */,
 				A10000290000000000000023 /* UnitNames.swift in Sources */,
 				A100002A0000000000000024 /* EarthMaterial.swift in Sources */,
+				A100002C0000000000000026 /* UpdaterController.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -565,6 +577,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		B00000010000000000000001 /* XCRemoteSwiftPackageReference "Sparkle" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sparkle-project/Sparkle";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.0.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		B10000010000000000000001 /* Sparkle */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B00000010000000000000001 /* XCRemoteSwiftPackageReference "Sparkle" */;
+			productName = Sparkle;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = A80000010000000000000001 /* Project object */;
 }

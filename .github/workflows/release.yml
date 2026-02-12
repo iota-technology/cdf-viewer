@@ -71,6 +71,60 @@ jobs:
           zip -r CDFViewer-${{ steps.version.outputs.version }}.zip CDFViewer.app
           ls -la CDFViewer-*.zip
 
+      - name: Download Sparkle
+        run: |
+          # Download Sparkle for the signing tools
+          curl -L -o sparkle.tar.xz https://github.com/sparkle-project/Sparkle/releases/download/2.7.5/Sparkle-2.7.5.tar.xz
+          mkdir -p sparkle-tools
+          tar -xf sparkle.tar.xz -C sparkle-tools
+          ls -la sparkle-tools/bin/
+
+      - name: Sign update with EdDSA
+        id: sign
+        env:
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+        run: |
+          # Write private key to temp file
+          echo "$SPARKLE_PRIVATE_KEY" > /tmp/sparkle_private.pem
+
+          # Get file size
+          FILE_SIZE=$(stat -f%z CDFViewer/build/Export/CDFViewer-${{ steps.version.outputs.version }}.zip)
+
+          # Sign the zip file with EdDSA
+          SIGNATURE=$(sparkle-tools/bin/sign_update CDFViewer/build/Export/CDFViewer-${{ steps.version.outputs.version }}.zip --ed-key-file /tmp/sparkle_private.pem | grep "sparkle:edSignature" | sed 's/.*sparkle:edSignature="\([^"]*\)".*/\1/')
+
+          echo "signature=$SIGNATURE" >> $GITHUB_OUTPUT
+          echo "file_size=$FILE_SIZE" >> $GITHUB_OUTPUT
+
+          # Clean up
+          rm /tmp/sparkle_private.pem
+
+      - name: Generate appcast
+        run: |
+          cat > CDFViewer/build/Export/appcast.xml << EOF
+          <?xml version="1.0" encoding="utf-8"?>
+          <rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" xmlns:dc="http://purl.org/dc/elements/1.1/">
+            <channel>
+              <title>CDF Viewer Updates</title>
+              <description>Most recent changes with links to updates.</description>
+              <language>en</language>
+              <item>
+                <title>Version ${{ steps.version.outputs.version }}</title>
+                <pubDate>$(date -R)</pubDate>
+                <sparkle:version>${{ github.run_number }}</sparkle:version>
+                <sparkle:shortVersionString>${{ steps.version.outputs.version }}</sparkle:shortVersionString>
+                <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+                <enclosure
+                  url="https://github.com/iota-technology/cdf-viewer/releases/download/v${{ steps.version.outputs.version }}/CDFViewer-${{ steps.version.outputs.version }}.zip"
+                  sparkle:edSignature="${{ steps.sign.outputs.signature }}"
+                  length="${{ steps.sign.outputs.file_size }}"
+                  type="application/octet-stream" />
+              </item>
+            </channel>
+          </rss>
+          EOF
+          cat CDFViewer/build/Export/appcast.xml
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
@@ -88,10 +142,14 @@ jobs:
             4. Drag `CDFViewer.app` to your Applications folder
             5. Open the app (if prompted, right-click → Open)
 
+            ### Auto-Updates
+            This version includes automatic update checking via Sparkle. Once installed, the app will notify you of future updates.
+
             ### Requirements
-            - macOS 26.0 (Tahoe) or later
+            - macOS 14.0 (Sonoma) or later
           files: |
             CDFViewer/build/Export/CDFViewer-${{ steps.version.outputs.version }}.zip
+            CDFViewer/build/Export/appcast.xml
           draft: false
           prerelease: false
         env:

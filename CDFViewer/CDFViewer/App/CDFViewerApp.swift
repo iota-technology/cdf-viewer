@@ -1,9 +1,13 @@
 import SwiftUI
+import Sparkle
 
 @main
 struct CDFViewerApp: App {
     /// AppKit delegate for NSDocument handling
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+
+    /// Sparkle updater controller
+    private let updaterController = UpdaterController()
 
     var body: some Scene {
         // Welcome window shown when no documents are open
@@ -20,6 +24,14 @@ struct CDFViewerApp: App {
                     NSDocumentController.shared.openDocument(nil)
                 }
                 .keyboardShortcut("o", modifiers: .command)
+            }
+
+            // Add Check for Updates to app menu
+            CommandGroup(after: .appInfo) {
+                Button("Check for Updates...") {
+                    updaterController.checkForUpdates()
+                }
+                .disabled(!updaterController.canCheckForUpdates)
             }
         }
     }
