@@ -19,6 +19,7 @@ struct CDFViewerApp: App {
         .defaultPosition(.center)
         .commands {
             // Replace default New Document with Open
+            // Note: "Open Recent" is added via AppDelegate using native AppKit menu
             CommandGroup(replacing: .newItem) {
                 Button("Open...") {
                     NSDocumentController.shared.openDocument(nil)

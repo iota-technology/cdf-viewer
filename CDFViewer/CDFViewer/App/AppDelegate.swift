@@ -43,6 +43,35 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             name: NSWindow.willCloseNotification,
             object: nil
         )
+
+        // Add "Open Recent" menu to File menu
+        setupOpenRecentMenu()
+    }
+
+    private func setupOpenRecentMenu() {
+        guard let mainMenu = NSApp.mainMenu,
+              let fileMenu = mainMenu.item(withTitle: "File")?.submenu else {
+            return
+        }
+
+        // Create the "Open Recent" submenu
+        let openRecentItem = NSMenuItem(title: "Open Recent", action: nil, keyEquivalent: "")
+        let openRecentMenu = NSMenu(title: "Open Recent")
+
+        // Add a placeholder that NSDocumentController will populate
+        let placeholder = NSMenuItem(title: "Clear Menu", action: #selector(NSDocumentController.clearRecentDocuments(_:)), keyEquivalent: "")
+        openRecentMenu.addItem(placeholder)
+
+        openRecentItem.submenu = openRecentMenu
+
+        // Find the "Open..." item and insert after it
+        let openIndex = fileMenu.indexOfItem(withTitle: "Open...")
+        if openIndex >= 0 {
+            fileMenu.insertItem(openRecentItem, at: openIndex + 1)
+        } else {
+            // Fallback: insert at index 1 (after first item)
+            fileMenu.insertItem(openRecentItem, at: min(1, fileMenu.numberOfItems))
+        }
     }
 
     func applicationWillTerminate(_ notification: Notification) {
