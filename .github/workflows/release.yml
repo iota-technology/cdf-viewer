@@ -106,12 +106,32 @@ jobs:
         run: |
           cd CDFViewer/build/Export
 
-          # Submit for notarization
-          xcrun notarytool submit CDFViewer-${{ steps.version.outputs.version }}.zip \
+          # Submit for notarization and capture the submission ID
+          SUBMISSION_OUTPUT=$(xcrun notarytool submit CDFViewer-${{ steps.version.outputs.version }}.zip \
             --key ~/private_keys/AuthKey_${APPLE_API_KEY_ID}.p8 \
             --key-id "$APPLE_API_KEY_ID" \
             --issuer "$APPLE_API_ISSUER_ID" \
-            --wait
+            --wait 2>&1) || true
+
+          echo "$SUBMISSION_OUTPUT"
+
+          # Extract submission ID
+          SUBMISSION_ID=$(echo "$SUBMISSION_OUTPUT" | grep "id:" | head -1 | awk '{print $2}')
+          echo "Submission ID: $SUBMISSION_ID"
+
+          # Check if notarization succeeded
+          if echo "$SUBMISSION_OUTPUT" | grep -q "status: Accepted"; then
+            echo "Notarization succeeded!"
+          else
+            echo "Notarization failed. Fetching log..."
+            xcrun notarytool log "$SUBMISSION_ID" \
+              --key ~/private_keys/AuthKey_${APPLE_API_KEY_ID}.p8 \
+              --key-id "$APPLE_API_KEY_ID" \
+              --issuer "$APPLE_API_ISSUER_ID" \
+              notarization-log.json || true
+            cat notarization-log.json
+            exit 1
+          fi
 
       - name: Staple notarization ticket
         run: |
