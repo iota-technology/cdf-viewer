@@ -213,6 +213,25 @@ extension VariableMetadata {
         )
     }
 
+    /// Get color for a specific vector component by name.
+    /// Supports any vector size (2D, 3D, 4D quaternion, etc.)
+    /// - Parameters:
+    ///   - component: Component name (e.g., "x", "y", "z", "w", "[0]", "[1]", etc.)
+    ///   - variable: The vector variable (used to get component names)
+    ///   - baseColor: The base color to derive variants from
+    /// - Returns: Color for the component, or baseColor if component not found
+    static func colorForComponent(_ component: String, variable: CDFVariable, baseColor: Color) -> Color {
+        guard let vectorSize = variable.vectorSize else {
+            return baseColor
+        }
+        let componentNames = CDFColumn.componentNames(for: variable)
+        guard let index = componentNames.firstIndex(of: component) else {
+            return baseColor
+        }
+        let variants = generateColorVariants(from: baseColor, count: vectorSize)
+        return variants[index]
+    }
+
     /// Generate N visually distinct colors from a starting color using adaptive LCH adjustments.
     /// - Parameters:
     ///   - baseColor: The starting color (used as first variant)

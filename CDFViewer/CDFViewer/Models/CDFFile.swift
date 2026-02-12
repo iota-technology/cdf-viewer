@@ -33,6 +33,9 @@ final class CDFFile: Identifiable {
             self.variables = reader.variables
             self.attributes = reader.attributes
             self.warnings = reader.warnings
+
+            // Resolve LABL_PTR_* attributes to get component labels for vector variables
+            resolveComponentLabels()
         } catch let error as CDFError {
             self.parseError = error
             self.fileInfo = CDFFileInfo(
@@ -51,6 +54,74 @@ final class CDFFile: Identifiable {
 
     var fileName: String {
         fileInfo.fileName
+    }
+
+    // MARK: - Component Label Resolution
+
+    /// Resolve LABL_PTR_* attributes to populate componentLabels for vector variables.
+    /// CDF ISTP convention uses LABL_PTR_1, LABL_PTR_2, etc. to point to label variables.
+    private func resolveComponentLabels() {
+        var updatedVariables: [CDFVariable] = []
+
+        for var variable in variables {
+            guard variable.isVector else {
+                updatedVariables.append(variable)
+                continue
+            }
+
+            // Find the appropriate LABL_PTR_* attribute for the component dimension
+            // For 2D variables like [N, 4], the component dimension is the last one
+            // LABL_PTR numbering starts at 1 and corresponds to varying dimensions
+            let labelPointerKey = findLabelPointerKey(for: variable)
+
+            if let labelVarName = variable.attributes[labelPointerKey],
+               let labelVariable = variables.first(where: { $0.name == labelVarName }),
+               let labels = readLabels(from: labelVariable) {
+                variable.componentLabels = labels
+            }
+
+            updatedVariables.append(variable)
+        }
+
+        self.variables = updatedVariables
+    }
+
+    /// Find the appropriate LABL_PTR_* attribute key for a variable's component dimension.
+    private func findLabelPointerKey(for variable: CDFVariable) -> String {
+        // For a variable with dimensions like [N, 4] where dimVarys is [F, T]:
+        // - The first varying dimension (T) is indexed as LABL_PTR_1
+        // - For most vector variables, this points to the component labels
+
+        // Count varying dimensions up to and including the last one
+        var varyingCount = 0
+        for varies in variable.dimVarys {
+            if varies {
+                varyingCount += 1
+            }
+        }
+
+        // The component dimension is typically the last dimension, so use that LABL_PTR
+        return "LABL_PTR_\(varyingCount)"
+    }
+
+    /// Read string labels from a label variable.
+    private func readLabels(from labelVariable: CDFVariable) -> [String]? {
+        guard labelVariable.dataType == .char || labelVariable.dataType == .uchar else {
+            return nil
+        }
+
+        do {
+            let data = try reader.readVariableData(labelVariable)
+            let labels = data.compactMap { value -> String? in
+                if case .string(let s) = value {
+                    return s.trimmingCharacters(in: .whitespaces)
+                }
+                return nil
+            }
+            return labels.isEmpty ? nil : labels
+        } catch {
+            return nil
+        }
     }
 
     // MARK: - Data Access

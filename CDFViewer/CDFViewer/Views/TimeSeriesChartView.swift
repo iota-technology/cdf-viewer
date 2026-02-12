@@ -542,17 +542,17 @@ struct TimeSeriesChartView: View {
             let component = String(parts[1])
 
             // Find the index of the FIRST component of this variable for consistent base color
-            // All components (X, Y, Z) should share the same base color
+            // All components (X, Y, Z, W, etc.) should share the same base color
             let firstComponentIndex = chartSeries.firstIndex(where: { $0.name.hasPrefix(varName + ".") }) ?? index
             let baseColor = viewModel.colorFor(varName, index: firstComponentIndex, palette: chartColorPalette)
 
-            // Use adaptive LCH algorithm for component colors
-            let componentColors = VariableMetadata.componentColors(for: baseColor)
-            switch component {
-            case "X": return componentColors.x
-            case "Y": return componentColors.y
-            case "Z": return componentColors.z
-            default: return baseColor
+            // Get the variable for component color lookup
+            if let file = viewModel.cdfFile,
+               let variable = file.variables.first(where: { $0.name == varName }),
+               variable.vectorSize != nil {
+                return VariableMetadata.colorForComponent(component, variable: variable, baseColor: baseColor)
+            } else {
+                return baseColor
             }
         } else {
             // Scalar variable - use custom color or palette
@@ -562,15 +562,7 @@ struct TimeSeriesChartView: View {
 
     /// Get component names for a vector variable
     private func componentNames(for variable: CDFVariable) -> [String] {
-        // Use displayColumnsPerRow which correctly handles 2D arrays like [86400, 3]
-        let count = variable.displayColumnsPerRow
-        if count == 3 {
-            return ["X", "Y", "Z"]
-        } else if count == 2 {
-            return ["X", "Y"]
-        } else {
-            return (0..<min(count, 10)).map { "[\($0)]" }
-        }
+        return CDFColumn.componentNames(for: variable)
     }
 }
 

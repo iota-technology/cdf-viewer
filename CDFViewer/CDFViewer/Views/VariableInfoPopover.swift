@@ -94,7 +94,13 @@ struct VariableInfoPopover: View {
     // MARK: - Color Picker with Sub-Colors
 
     private let componentRowHeight: CGFloat = 18
-    private let subColorsHeight: CGFloat = 62  // 3 rows + spacing
+
+    /// Height needed for sub-colors based on vector size
+    private var subColorsHeight: CGFloat {
+        guard let size = variable.vectorSize else { return 0 }
+        // Each row is ~18pt + 2pt spacing
+        return CGFloat(size) * 20 + 2
+    }
 
     @ViewBuilder
     private var colorPickerWithSubColors: some View {
@@ -105,11 +111,14 @@ struct VariableInfoPopover: View {
             }
             .overlay(alignment: .topLeading) {
                 // Sub-colors cascade below the color picker (vectors only)
-                if variable.isVector {
+                if let size = variable.vectorSize {
+                    let componentNames = CDFColumn.componentNames(for: variable)
+                    let componentColors = VariableMetadata.generateColorVariants(from: selectedColor, count: size)
+
                     VStack(alignment: .leading, spacing: 2) {
-                        animatedColorRow("X", color: selectedColor, index: 0)
-                        animatedColorRow("Y", color: selectedColor.lchHueShifted(by: 30), index: 1)
-                        animatedColorRow("Z", color: selectedColor.lchHueShifted(by: 60), index: 2)
+                        ForEach(Array(componentNames.enumerated()), id: \.offset) { index, name in
+                            animatedColorRow(name, color: componentColors[index], index: index, totalCount: size)
+                        }
                     }
                     .clipped()
                     .padding(.top, 28)  // Position below the color picker
@@ -146,10 +155,10 @@ struct VariableInfoPopover: View {
     }
 
     @ViewBuilder
-    private func animatedColorRow(_ label: String, color: Color, index: Int) -> some View {
-        // Staggered cascade: expand in order (X→Y→Z), collapse in reverse (Z→Y→X) at 2x speed
+    private func animatedColorRow(_ label: String, color: Color, index: Int, totalCount: Int) -> some View {
+        // Staggered cascade: expand in order (first→last), collapse in reverse at 2x speed
         let expandDelay = Double(index) * 0.12
-        let collapseDelay = Double(2 - index) * 0.06
+        let collapseDelay = Double(totalCount - 1 - index) * 0.06
 
         HStack(spacing: 4) {
             Circle()

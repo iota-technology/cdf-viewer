@@ -299,15 +299,7 @@ final class CDFViewModel {
 
     /// Get component names for a vector variable
     private func componentNames(for variable: CDFVariable) -> [String] {
-        // Use displayColumnsPerRow which correctly handles 2D arrays like [86400, 3]
-        let count = variable.displayColumnsPerRow
-        if count == 3 {
-            return ["X", "Y", "Z"]
-        } else if count == 2 {
-            return ["X", "Y"]
-        } else {
-            return (0..<min(count, 10)).map { "[\($0)]" }
-        }
+        return CDFColumn.componentNames(for: variable)
     }
 
     // MARK: - Chart Data

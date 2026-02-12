@@ -14,6 +14,10 @@ struct CDFVariable: Identifiable, Hashable {
     let cprOffset: Int64
     let attributes: [String: String]
 
+    /// Component labels from LABL_PTR_* attribute (e.g., ["x", "y", "z", "w"] for quaternions)
+    /// This is resolved after parsing by looking up the referenced label variable.
+    var componentLabels: [String]?
+
     /// Total number of elements per record
     var totalElements: Int {
         if dimensions.isEmpty {
@@ -29,10 +33,10 @@ struct CDFVariable: Identifiable, Hashable {
 
     /// Whether this is a single-record variable with a 1D array dimension.
     /// In this case, we display dimension elements as rows rather than records.
-    /// The threshold of > 3 distinguishes actual arrays from 3-vectors which
-    /// should be displayed as X/Y/Z columns rather than separate rows.
+    /// The threshold of > 10 distinguishes actual arrays from vectors (2-10 elements)
+    /// which should be displayed as columns rather than separate rows.
     var isSingleRecordArray: Bool {
-        return maxRecord == 0 && dimensions.count == 1 && dimensions[0] > 3
+        return maxRecord == 0 && dimensions.count == 1 && dimensions[0] > 10
     }
 
     /// Whether each CDF record contains multiple displayable rows.
@@ -58,8 +62,8 @@ struct CDFVariable: Identifiable, Hashable {
         if isSingleRecordArray {
             return 1
         }
-        if dimensions.count >= 2 && dimensions.last == 3 {
-            return 3  // 3-vector
+        if let size = vectorSize {
+            return size
         }
         if dimensions.isEmpty || dimensions == [1] {
             return 1
@@ -67,9 +71,17 @@ struct CDFVariable: Identifiable, Hashable {
         return dimensions.last ?? 1
     }
 
-    /// Whether this variable contains vector data (e.g., 3-vec)
+    /// Whether this variable contains vector data (2D, 3D, 4D quaternion, etc.)
+    /// Vectors are defined as having a last dimension between 2 and 10.
     var isVector: Bool {
-        return dimensions.count >= 1 && dimensions.last == 3
+        guard let lastDim = dimensions.last else { return false }
+        return lastDim >= 2 && lastDim <= 10
+    }
+
+    /// Size of the vector (number of components), or nil if not a vector
+    var vectorSize: Int? {
+        guard isVector else { return nil }
+        return dimensions.last
     }
 
     /// Whether this appears to be ECEF position data
@@ -202,6 +214,20 @@ struct CDFColumn: Identifiable {
         return 150
     }
 
+    /// Get component names for a variable.
+    /// Uses componentLabels from LABL_PTR_* if available, otherwise uses indices.
+    static func componentNames(for variable: CDFVariable) -> [String] {
+        guard let size = variable.vectorSize else { return [] }
+
+        // Use labels from CDF file if available
+        if let labels = variable.componentLabels, labels.count == size {
+            return labels
+        }
+
+        // Fall back to indices - no assumptions about meaning
+        return (0..<size).map { "[\($0)]" }
+    }
+
     static func columnsForVariable(_ variable: CDFVariable) -> [CDFColumn] {
         let width = widthForDataType(variable.dataType)
 
@@ -212,22 +238,12 @@ struct CDFColumn: Identifiable {
             ]
         }
 
-        // 2D array with last dim = 3 (e.g., [N, 3] for positions): show as X, Y, Z
-        if variable.dimensions.count == 2 && variable.dimensions[1] == 3 {
-            return [
-                CDFColumn(id: 0, name: "X", dataType: variable.dataType, width: 120),
-                CDFColumn(id: 1, name: "Y", dataType: variable.dataType, width: 120),
-                CDFColumn(id: 2, name: "Z", dataType: variable.dataType, width: 120)
-            ]
-        }
-
-        // 1D array with exactly 3 elements: show as X, Y, Z
-        if variable.dimensions.count == 1 && variable.dimensions[0] == 3 {
-            return [
-                CDFColumn(id: 0, name: "X", dataType: variable.dataType, width: 120),
-                CDFColumn(id: 1, name: "Y", dataType: variable.dataType, width: 120),
-                CDFColumn(id: 2, name: "Z", dataType: variable.dataType, width: 120)
-            ]
+        // Vector variable (2-10 components): show with appropriate column names
+        if variable.vectorSize != nil {
+            let names = componentNames(for: variable)
+            return names.enumerated().map { i, name in
+                CDFColumn(id: i, name: name, dataType: variable.dataType, width: 120)
+            }
         }
 
         // Scalar or single-element dimension
