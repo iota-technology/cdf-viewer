@@ -367,7 +367,7 @@ final class CDFViewModel {
             var values: [String] = []
             for column in tableColumns {
                 if column.key == "time" {
-                    values.append(allTimestamps[i].ISO8601Format())
+                    values.append(allTimestamps[i].ISO8601Format(Date.ISO8601FormatStyle(includingFractionalSeconds: true)))
                 } else if let val = value(column: column.key, at: i) {
                     values.append(formatValue(val))
                 } else {
