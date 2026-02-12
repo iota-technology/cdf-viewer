@@ -113,8 +113,15 @@ jobs:
             --identifier "org.sparkle-project.Sparkle" \
             Versions/B
 
-          # Go back and re-sign the main app
+          # Go back to app root
           cd ../../../..
+
+          # Re-sign QuickLook extension with hardened runtime
+          codesign --force --timestamp --options runtime \
+            -s "Developer ID Application" \
+            Contents/PlugIns/CDFQuickLook.appex
+
+          # Re-sign the main app
           codesign --force --timestamp --options runtime \
             -s "Developer ID Application" \
             CDFViewer.app
