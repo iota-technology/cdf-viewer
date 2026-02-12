@@ -60,6 +60,10 @@ final class CDFFile: Identifiable {
 
     /// Resolve LABL_PTR_* attributes to populate componentLabels for vector variables.
     /// CDF ISTP convention uses LABL_PTR_1, LABL_PTR_2, etc. to point to label variables.
+    /// Handles three formats:
+    /// 1. Single variable name pointing to a label array (standard ISTP)
+    /// 2. Multiple variable names (one per component), each containing a label string
+    /// 3. Direct labels in the attribute value itself (separated by newlines)
     private func resolveComponentLabels() {
         var updatedVariables: [CDFVariable] = []
 
@@ -70,14 +74,40 @@ final class CDFFile: Identifiable {
             }
 
             // Find the appropriate LABL_PTR_* attribute for the component dimension
-            // For 2D variables like [N, 4], the component dimension is the last one
-            // LABL_PTR numbering starts at 1 and corresponds to varying dimensions
-            let labelPointerKey = findLabelPointerKey(for: variable)
+            guard let labelPointerKey = findLabelPointerKey(for: variable),
+                  let labelPointerValue = variable.attributes[labelPointerKey] else {
+                updatedVariables.append(variable)
+                continue
+            }
 
-            if let labelVarName = variable.attributes[labelPointerKey],
-               let labelVariable = variables.first(where: { $0.name == labelVarName }),
-               let labels = readLabels(from: labelVariable) {
-                variable.componentLabels = labels
+            // Case 1: Single variable name pointing to label array
+            if let labelVariable = variables.first(where: { $0.name == labelPointerValue }) {
+                if let labels = readLabels(from: labelVariable) {
+                    variable.componentLabels = labels
+                }
+            }
+            // Case 2 & 3: Multiple values (newline-separated variable names or direct labels)
+            else if labelPointerValue.contains("\n") || labelPointerValue.contains(",") {
+                let separator = labelPointerValue.contains("\n") ? "\n" : ","
+                let parts = labelPointerValue.components(separatedBy: separator)
+                    .map { $0.trimmingCharacters(in: .whitespaces) }
+                    .filter { !$0.isEmpty }
+
+                // Try to look up each part as a variable name
+                var labels: [String] = []
+                for part in parts {
+                    if let labelVar = variables.first(where: { $0.name == part }),
+                       let label = readSingleLabel(from: labelVar) {
+                        labels.append(label)
+                    } else {
+                        // Use the part itself as the label (clean it up)
+                        labels.append(cleanupLabel(part))
+                    }
+                }
+
+                if labels.count == variable.vectorSize {
+                    variable.componentLabels = labels
+                }
             }
 
             updatedVariables.append(variable)
@@ -87,24 +117,19 @@ final class CDFFile: Identifiable {
     }
 
     /// Find the appropriate LABL_PTR_* attribute key for a variable's component dimension.
-    private func findLabelPointerKey(for variable: CDFVariable) -> String {
-        // For a variable with dimensions like [N, 4] where dimVarys is [F, T]:
-        // - The first varying dimension (T) is indexed as LABL_PTR_1
-        // - For most vector variables, this points to the component labels
-
-        // Count varying dimensions up to and including the last one
-        var varyingCount = 0
-        for varies in variable.dimVarys {
-            if varies {
-                varyingCount += 1
+    /// Returns the first LABL_PTR_N that exists in the variable's attributes.
+    private func findLabelPointerKey(for variable: CDFVariable) -> String? {
+        // Try LABL_PTR_1 through LABL_PTR_3 (covers most use cases)
+        for n in 1...3 {
+            let key = "LABL_PTR_\(n)"
+            if variable.attributes[key] != nil {
+                return key
             }
         }
-
-        // The component dimension is typically the last dimension, so use that LABL_PTR
-        return "LABL_PTR_\(varyingCount)"
+        return nil
     }
 
-    /// Read string labels from a label variable.
+    /// Read string labels from a label variable (array of strings).
     private func readLabels(from labelVariable: CDFVariable) -> [String]? {
         guard labelVariable.dataType == .char || labelVariable.dataType == .uchar else {
             return nil
@@ -122,6 +147,47 @@ final class CDFFile: Identifiable {
         } catch {
             return nil
         }
+    }
+
+    /// Read a single label string from a scalar string variable.
+    private func readSingleLabel(from labelVariable: CDFVariable) -> String? {
+        guard labelVariable.dataType == .char || labelVariable.dataType == .uchar else {
+            return nil
+        }
+
+        do {
+            let data = try reader.readVariableData(labelVariable)
+            // Get the first string value
+            for value in data {
+                if case .string(let s) = value {
+                    return s.trimmingCharacters(in: .whitespaces)
+                }
+            }
+            return nil
+        } catch {
+            return nil
+        }
+    }
+
+    /// Clean up a label value that might be a variable name or raw label.
+    /// Examples: "x_ecef_label" → "X", "r_ecef_label" → "r_ecef"
+    private func cleanupLabel(_ rawLabel: String) -> String {
+        var label = rawLabel
+
+        // Remove common suffixes like "_label", "_lbl"
+        for suffix in ["_label", "_lbl", "_LABEL", "_LBL"] {
+            if label.hasSuffix(suffix) {
+                label = String(label.dropLast(suffix.count))
+                break
+            }
+        }
+
+        // If it's a simple coordinate indicator (x, y, z, w, etc.), uppercase it
+        if label.count == 1 || (label.count <= 2 && label.allSatisfy { $0.isLetter }) {
+            return label.uppercased()
+        }
+
+        return label
     }
 
     // MARK: - Data Access
