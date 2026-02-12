@@ -59,6 +59,8 @@ jobs:
           rm $RUNNER_TEMP/certificate.p12
 
       - name: Build and sign app
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
           cd CDFViewer
           xcodebuild -scheme CDFViewer \
@@ -68,7 +70,8 @@ jobs:
             -archivePath build/CDFViewer.xcarchive \
             archive \
             CODE_SIGN_STYLE=Manual \
-            CODE_SIGN_IDENTITY="Developer ID Application"
+            CODE_SIGN_IDENTITY="Developer ID Application" \
+            DEVELOPMENT_TEAM="$APPLE_TEAM_ID"
 
       - name: Export signed app from archive
         run: |
