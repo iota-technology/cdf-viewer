@@ -79,9 +79,49 @@ jobs:
           mkdir -p build/Export
           cp -R build/CDFViewer.xcarchive/Products/Applications/CDFViewer.app build/Export/
 
-          # Verify code signature
-          codesign --verify --deep --strict build/Export/CDFViewer.app
-          echo "Code signature verified successfully"
+      - name: Re-sign Sparkle framework for notarization
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          cd CDFViewer/build/Export/CDFViewer.app/Contents/Frameworks/Sparkle.framework
+
+          # Sign XPC services first (innermost)
+          codesign --force --timestamp --options runtime \
+            -s "Developer ID Application" \
+            --identifier "org.sparkle-project.Downloader" \
+            Versions/B/XPCServices/Downloader.xpc
+
+          codesign --force --timestamp --options runtime \
+            -s "Developer ID Application" \
+            --identifier "org.sparkle-project.Installer" \
+            Versions/B/XPCServices/Installer.xpc
+
+          # Sign Updater.app
+          codesign --force --timestamp --options runtime \
+            -s "Developer ID Application" \
+            --identifier "org.sparkle-project.Updater" \
+            Versions/B/Updater.app
+
+          # Sign Autoupdate executable
+          codesign --force --timestamp --options runtime \
+            -s "Developer ID Application" \
+            Versions/B/Autoupdate
+
+          # Sign the framework itself
+          codesign --force --timestamp --options runtime \
+            -s "Developer ID Application" \
+            --identifier "org.sparkle-project.Sparkle" \
+            Versions/B
+
+          # Go back and re-sign the main app
+          cd ../../../..
+          codesign --force --timestamp --options runtime \
+            -s "Developer ID Application" \
+            CDFViewer.app
+
+          # Verify everything
+          codesign --verify --deep --strict CDFViewer.app
+          echo "All signatures verified successfully"
 
       - name: Setup notarization credentials
         env:
