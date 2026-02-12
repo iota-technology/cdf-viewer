@@ -514,13 +514,13 @@
 				INFOPLIST_FILE = CDFViewer/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "CDF Viewer";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
-				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "Iota Technology";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 0.4.4;
-				PRODUCT_BUNDLE_IDENTIFIER = com.example.CDFViewer;
+				PRODUCT_BUNDLE_IDENTIFIER = com.iotatechnology.CDFViewer;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
@@ -542,13 +542,13 @@
 				INFOPLIST_FILE = CDFViewer/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "CDF Viewer";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
-				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "Iota Technology";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 0.4.4;
-				PRODUCT_BUNDLE_IDENTIFIER = com.example.CDFViewer;
+				PRODUCT_BUNDLE_IDENTIFIER = com.iotatechnology.CDFViewer;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;

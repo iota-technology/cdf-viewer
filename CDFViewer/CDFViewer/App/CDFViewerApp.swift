@@ -26,6 +26,13 @@ struct CDFViewerApp: App {
                 .keyboardShortcut("o", modifiers: .command)
             }
 
+            // Custom About with clickable links
+            CommandGroup(replacing: .appInfo) {
+                Button("About CDF Viewer") {
+                    appDelegate.showAboutWindow()
+                }
+            }
+
             // Add Check for Updates to app menu
             CommandGroup(after: .appInfo) {
                 Button("Check for Updates...") {
@@ -51,8 +58,22 @@ struct WelcomeView: View {
                 .font(.largeTitle)
                 .fontWeight(.semibold)
 
-            Text("View NASA Common Data Format files")
-                .foregroundStyle(.secondary)
+            VStack(spacing: 4) {
+                Text("View NASA Common Data Format files")
+                    .foregroundStyle(.secondary)
+
+                HStack(spacing: 4) {
+                    Text("Made")
+                        .foregroundStyle(.tertiary)
+                    Link("byJP", destination: URL(string: "https://byjp.biz")!)
+                        .opacity(0.7)
+                    Text("for")
+                        .foregroundStyle(.tertiary)
+                    Link("Iota Technology", destination: URL(string: "https://iotatechnology.com")!)
+                        .opacity(0.7)
+                }
+                .font(.caption)
+            }
 
             Button(action: openFile) {
                 Label("Open a CDF File", systemImage: "doc.badge.plus")

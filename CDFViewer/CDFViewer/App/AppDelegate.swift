@@ -16,6 +16,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     /// Reference to the welcome window for programmatic control
     private weak var welcomeWindow: NSWindow?
 
+    /// About window
+    private var aboutWindow: NSWindow?
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Register for auxiliary window notifications
         NotificationCenter.default.addObserver(
@@ -182,5 +185,79 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         window.makeKeyAndOrderFront(nil)
         globeWindows[id] = window
+    }
+
+    // MARK: - About Window
+
+    @objc func showAboutWindow() {
+        if let existing = aboutWindow, existing.isVisible {
+            existing.makeKeyAndOrderFront(nil)
+            return
+        }
+
+        let aboutView = AboutView()
+        let hostingController = NSHostingController(rootView: aboutView)
+
+        let window = NSPanel(contentViewController: hostingController)
+        window.setContentSize(NSSize(width: 340, height: 320))
+        window.styleMask = [.titled, .closable]
+        window.title = "About CDF Viewer"
+        window.isMovableByWindowBackground = true
+        window.center()
+        window.makeKeyAndOrderFront(nil)
+        aboutWindow = window
+    }
+}
+
+// MARK: - About View
+
+/// Custom About view with clickable company links
+struct AboutView: View {
+    private var version: String {
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
+    }
+
+    private var build: String {
+        Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
+    }
+
+    var body: some View {
+        VStack(spacing: 16) {
+            Image(nsImage: NSApp.applicationIconImage)
+                .resizable()
+                .frame(width: 96, height: 96)
+
+            Text("CDF Viewer")
+                .font(.title)
+                .fontWeight(.semibold)
+
+            Text("Version \(version) (\(build))")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+
+            Text("View NASA Common Data Format files")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+
+            Divider()
+                .padding(.horizontal, 32)
+
+            VStack(spacing: 8) {
+                HStack(spacing: 4) {
+                    Text("Made")
+                        .foregroundStyle(.secondary)
+                    Link("byJP Limited", destination: URL(string: "https://byjp.biz")!)
+                }
+
+                HStack(spacing: 4) {
+                    Text("for")
+                        .foregroundStyle(.secondary)
+                    Link("Iota Technology", destination: URL(string: "https://iotatechnology.com")!)
+                }
+            }
+            .font(.callout)
+        }
+        .padding(32)
+        .frame(width: 340, height: 320)
     }
 }
