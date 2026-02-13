@@ -22,10 +22,10 @@ Time series visualization for selected variables. Opens as an auxiliary window f
 
 Variables are disabled based on two checks (in priority order):
 
-1. **Time association (DEPEND_0)**
-   - Data variables must be associated with the selected time variable via `DEPEND_0` attribute
+1. **Time association (DEPEND_*)**
+   - Data variables must be associated with the selected time variable via any `DEPEND_*` attribute (DEPEND_0, DEPEND_1, or DEPEND_2)
    - Time variables must be associated with at least one selected data variable
-   - Variables without `DEPEND_0` are treated as compatible with any time variable
+   - Variables without any `DEPEND_*` referencing a time variable are constants (see `constants-view.md`)
    - Disabled tooltip explains which time variable to select
 
 2. **Unit compatibility**
