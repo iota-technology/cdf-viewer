@@ -48,24 +48,38 @@ struct ConstantCard: View {
                             .foregroundStyle(.secondary)
                     }
                 }
+            } else if constant.isMatrix,
+                      let matrixRows = constant.matrixRows {
+                // Matrix - display as grid with optional row/column headers
+                MatrixGridView(
+                    matrixRows: matrixRows,
+                    rowLabels: constant.matrixRowLabels,
+                    colLabels: constant.matrixColumnLabels,
+                    units: constant.formattedUnits
+                )
             } else if constant.values.count <= 10 {
                 // Small array - show values in bracketed column with units to the right
+                // Uses same styling as matrix row labels for consistency
                 let fontSize: CGFloat = constant.values.count <= 3 ? 18 : (constant.values.count <= 6 ? 15 : 13)
                 let valuesWithLabels = constant.formattedValuesWithLabels
+                let hasLabels = valuesWithLabels.contains { $0.label != nil }
 
                 HStack(alignment: .center, spacing: 6) {
                     // Bracketed values column
                     BracketedColumn(fontSize: fontSize) {
                         ForEach(Array(valuesWithLabels.enumerated()), id: \.offset) { _, item in
-                            HStack(spacing: 4) {
-                                if let label = item.label {
-                                    Text("\(label):")
-                                        .font(.system(size: fontSize - 2))
-                                        .foregroundStyle(.secondary)
+                            HStack(spacing: 0) {
+                                // Row label (same style as matrix)
+                                if hasLabels {
+                                    Text(item.label ?? "")
+                                        .font(.system(size: fontSize - 4))
+                                        .foregroundStyle(.tertiary)
+                                        .frame(width: 20, alignment: .trailing)
                                 }
                                 Text(item.value)
                                     .font(.system(size: fontSize, weight: .medium, design: .monospaced))
                                     .textSelection(.enabled)
+                                    .frame(width: 60)
                             }
                         }
                     }
@@ -164,5 +178,93 @@ struct BracketShape: Shape {
         }
 
         return path
+    }
+}
+
+/// Display a matrix as a grid with optional row and column headers
+struct MatrixGridView: View {
+    let matrixRows: [[String]]
+    let rowLabels: [String]?
+    let colLabels: [String]?
+    let units: String?
+
+    private var fontSize: CGFloat {
+        // Adjust font size based on matrix dimensions
+        let totalCells = matrixRows.count * (matrixRows.first?.count ?? 0)
+        if totalCells <= 4 { return 16 }
+        if totalCells <= 9 { return 14 }
+        return 12
+    }
+
+    private var hasLabels: Bool {
+        rowLabels != nil || colLabels != nil
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(alignment: .center, spacing: 4) {
+                // Matrix with brackets
+                HStack(spacing: 2) {
+                    // Left bracket
+                    BracketShape(isLeft: true)
+                        .stroke(Color.secondary.opacity(0.4), lineWidth: 1)
+                        .frame(width: 6)
+
+                    // Grid content
+                    VStack(alignment: .leading, spacing: 2) {
+                        // Column headers (only if we have labels)
+                        if let colLabels = colLabels {
+                            HStack(spacing: 0) {
+                                // Empty corner cell (only if we also have row labels)
+                                if rowLabels != nil {
+                                    Text("")
+                                        .frame(width: 20)
+                                }
+
+                                ForEach(Array(colLabels.enumerated()), id: \.offset) { _, label in
+                                    Text(label)
+                                        .font(.system(size: fontSize - 4))
+                                        .foregroundStyle(.tertiary)
+                                        .frame(width: 60)
+                                }
+                            }
+                        }
+
+                        // Matrix rows with optional row headers
+                        ForEach(Array(matrixRows.enumerated()), id: \.offset) { rowIndex, row in
+                            HStack(spacing: 0) {
+                                // Row header (only if we have labels)
+                                if let rowLabels = rowLabels {
+                                    Text(rowLabels[rowIndex])
+                                        .font(.system(size: fontSize - 4))
+                                        .foregroundStyle(.tertiary)
+                                        .frame(width: 20, alignment: .trailing)
+                                }
+
+                                // Row values
+                                ForEach(Array(row.enumerated()), id: \.offset) { _, value in
+                                    Text(value)
+                                        .font(.system(size: fontSize, weight: .medium, design: .monospaced))
+                                        .textSelection(.enabled)
+                                        .frame(width: 60)
+                                }
+                            }
+                        }
+                    }
+
+                    // Right bracket
+                    BracketShape(isLeft: false)
+                        .stroke(Color.secondary.opacity(0.4), lineWidth: 1)
+                        .frame(width: 6)
+                }
+
+                // Units to the right
+                if let units = units {
+                    Text(units)
+                        .font(.system(size: fontSize - 2))
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
     }
 }

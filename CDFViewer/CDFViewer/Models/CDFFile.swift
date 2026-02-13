@@ -58,7 +58,8 @@ final class CDFFile: Identifiable {
 
     // MARK: - Component Label Resolution
 
-    /// Resolve LABL_PTR_* attributes to populate componentLabels for vector variables.
+    /// Resolve LABL_PTR_* attributes to populate componentLabels for vector variables
+    /// and matrixRowLabels/matrixColumnLabels for matrix variables.
     /// CDF ISTP convention uses LABL_PTR_1, LABL_PTR_2, etc. to point to label variables.
     /// Handles three formats:
     /// 1. Single variable name pointing to a label array (standard ISTP)
@@ -68,6 +69,14 @@ final class CDFFile: Identifiable {
         var updatedVariables: [CDFVariable] = []
 
         for var variable in variables {
+            // Handle matrices (2D arrays with both dimensions ≤10)
+            if variable.isMatrix {
+                variable = resolveMatrixLabels(for: variable)
+                updatedVariables.append(variable)
+                continue
+            }
+
+            // Handle vectors (1D arrays with size 2-10)
             guard variable.isVector else {
                 updatedVariables.append(variable)
                 continue
@@ -80,51 +89,84 @@ final class CDFFile: Identifiable {
                 continue
             }
 
-            // Case 1: Single variable name pointing to label array
-            if let labelVariable = variables.first(where: { $0.name == labelPointerValue }) {
-                if let labels = readLabels(from: labelVariable) {
-                    variable.componentLabels = labels
-                }
-            }
-            // Case 2 & 3: Multiple values (newline-separated variable names or direct labels)
-            else if labelPointerValue.contains("\n") || labelPointerValue.contains(",") {
-                let separator = labelPointerValue.contains("\n") ? "\n" : ","
-                let parts = labelPointerValue.components(separatedBy: separator)
-                    .map { $0.trimmingCharacters(in: .whitespaces) }
-                    .filter { !$0.isEmpty }
-
-                // Try to look up each part as a variable name
-                var labels: [String] = []
-                for part in parts {
-                    if let labelVar = variables.first(where: { $0.name == part }),
-                       let label = readSingleLabel(from: labelVar) {
-                        labels.append(label)
-                    } else {
-                        // Use the part itself as the label (clean it up)
-                        labels.append(cleanupLabel(part))
-                    }
-                }
-
-                if labels.count == variable.vectorSize {
-                    variable.componentLabels = labels
-                }
-            }
-
+            variable.componentLabels = resolveLabels(from: labelPointerValue, expectedCount: variable.vectorSize)
             updatedVariables.append(variable)
         }
 
         self.variables = updatedVariables
     }
 
-    /// Find the appropriate LABL_PTR_* attribute key for a variable's component dimension.
-    /// Returns the first LABL_PTR_N that exists in the variable's attributes.
+    /// Resolve matrix row and column labels from LABL_PTR_1/LABL_PTR_2 or DEPEND_1/DEPEND_2 attributes.
+    /// LABL_PTR is preferred, DEPEND is used as fallback when it points to a label variable.
+    private func resolveMatrixLabels(for variable: CDFVariable) -> CDFVariable {
+        var updated = variable
+        guard let dims = variable.matrixDimensions else { return updated }
+
+        // Row labels: try LABL_PTR_1 first, then DEPEND_1
+        if let rowPointer = variable.attributes["LABL_PTR_1"] ?? variable.attributes["DEPEND_1"] {
+            updated.matrixRowLabels = resolveLabels(from: rowPointer, expectedCount: dims.rows)
+        }
+
+        // Column labels: try LABL_PTR_2 first, then DEPEND_2
+        if let colPointer = variable.attributes["LABL_PTR_2"] ?? variable.attributes["DEPEND_2"] {
+            updated.matrixColumnLabels = resolveLabels(from: colPointer, expectedCount: dims.cols)
+        }
+
+        return updated
+    }
+
+    /// Resolve labels from a label pointer value.
+    /// Handles variable references, newline/comma-separated lists, and direct values.
+    private func resolveLabels(from labelPointerValue: String, expectedCount: Int?) -> [String]? {
+        // Case 1: Single variable name pointing to label array
+        if let labelVariable = variables.first(where: { $0.name == labelPointerValue }) {
+            if let labels = readLabels(from: labelVariable) {
+                return labels
+            }
+        }
+
+        // Case 2 & 3: Multiple values (newline-separated variable names or direct labels)
+        if labelPointerValue.contains("\n") || labelPointerValue.contains(",") {
+            let separator = labelPointerValue.contains("\n") ? "\n" : ","
+            let parts = labelPointerValue.components(separatedBy: separator)
+                .map { $0.trimmingCharacters(in: .whitespaces) }
+                .filter { !$0.isEmpty }
+
+            // Try to look up each part as a variable name
+            var labels: [String] = []
+            for part in parts {
+                if let labelVar = variables.first(where: { $0.name == part }),
+                   let label = readSingleLabel(from: labelVar) {
+                    labels.append(label)
+                } else {
+                    // Use the part itself as the label (clean it up)
+                    labels.append(cleanupLabel(part))
+                }
+            }
+
+            if let expected = expectedCount, labels.count == expected {
+                return labels
+            } else if expectedCount == nil && !labels.isEmpty {
+                return labels
+            }
+        }
+
+        return nil
+    }
+
+    /// Find the appropriate label attribute key for a variable's component dimension.
+    /// Tries LABL_PTR_N first, then DEPEND_N as fallback (if it points to a label variable).
     private func findLabelPointerKey(for variable: CDFVariable) -> String? {
-        // Try LABL_PTR_1 through LABL_PTR_3 (covers most use cases)
+        // Try LABL_PTR_1 through LABL_PTR_3 first (preferred)
         for n in 1...3 {
             let key = "LABL_PTR_\(n)"
             if variable.attributes[key] != nil {
                 return key
             }
+        }
+        // Fall back to DEPEND_1 (commonly used for labels in some CDF files)
+        if variable.attributes["DEPEND_1"] != nil {
+            return "DEPEND_1"
         }
         return nil
     }

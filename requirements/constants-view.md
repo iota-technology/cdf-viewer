@@ -43,6 +43,14 @@ Convert common unit patterns to proper symbols:
 - Component labels shown if LABL_PTR_* attribute provides them
 - Font size scales based on element count (18pt for ≤3, 15pt for ≤6, 13pt for ≤10)
 
+### Matrix Display
+
+- 2D arrays where both dimensions are ≤10 are displayed as visual matrices
+- Row and column headers from LABL_PTR_1 and LABL_PTR_2 attributes
+- Square brackets frame the entire matrix grid
+- Combined labels used for flat representation (e.g., "xx", "xy", "xz" for 3x3)
+- Font size scales based on total cell count
+
 ### Disabled Features
 When viewing constants:
 - Chart button disabled (no time axis)

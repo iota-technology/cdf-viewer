@@ -21,8 +21,16 @@ The primary view for exploring raw CDF data. Shows timestamps and selected varia
 
 - Single-select for independent variable (time variable or constants mode)
 - Multi-select for data variables (each becomes a column)
-- Vector variables expand to X, Y, Z component columns
+- Vector variables expand to component columns (e.g., x, y, z)
+- Matrix variables expand to combined columns (e.g., xx, xy, xz, yx, yy, yz, zx, zy, zz)
 - Data variables filtered based on DEPEND_* attributes matching selected time variable
+
+### Matrix Support
+
+- 2D arrays where both dimensions are ≤10 are treated as matrices
+- Each matrix element becomes a separate column
+- Column labels combine row and column dimension labels (from LABL_PTR_1 and LABL_PTR_2)
+- Example: A 3x3 matrix with labels ["x","y","z"] produces columns: xx, xy, xz, yx, yy, yz, zx, zy, zz
 
 ### Timestamp Format
 

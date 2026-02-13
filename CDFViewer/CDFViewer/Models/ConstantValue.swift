@@ -73,6 +73,50 @@ struct ConstantValue: Identifiable {
         values.count == 1
     }
 
+    /// Whether this is a matrix variable
+    var isMatrix: Bool {
+        variable.isMatrix
+    }
+
+    /// Matrix dimensions (rows, cols), or nil if not a matrix
+    var matrixDimensions: (rows: Int, cols: Int)? {
+        variable.matrixDimensions
+    }
+
+    /// Row labels for matrix display (nil if no real labels from LABL_PTR_1)
+    var matrixRowLabels: [String]? {
+        guard matrixDimensions != nil else { return nil }
+        return variable.matrixRowLabels
+    }
+
+    /// Column labels for matrix display (nil if no real labels from LABL_PTR_2)
+    var matrixColumnLabels: [String]? {
+        guard matrixDimensions != nil else { return nil }
+        return variable.matrixColumnLabels
+    }
+
+    /// Whether this matrix has real labels (from LABL_PTR attributes)
+    var hasMatrixLabels: Bool {
+        return matrixRowLabels != nil || matrixColumnLabels != nil
+    }
+
+    /// Matrix values organized by row for display
+    var matrixRows: [[String]]? {
+        guard let dims = matrixDimensions else { return nil }
+        guard values.count == dims.rows * dims.cols else { return nil }
+
+        var rows: [[String]] = []
+        for row in 0..<dims.rows {
+            var rowValues: [String] = []
+            for col in 0..<dims.cols {
+                let index = row * dims.cols + col
+                rowValues.append(values[index].stringValue)
+            }
+            rows.append(rowValues)
+        }
+        return rows
+    }
+
     /// Formatted value string for display
     var formattedValue: String {
         if values.isEmpty {

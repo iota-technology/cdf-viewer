@@ -18,6 +18,12 @@ struct CDFVariable: Identifiable, Hashable {
     /// This is resolved after parsing by looking up the referenced label variable.
     var componentLabels: [String]?
 
+    /// Row labels for matrix variables (from LABL_PTR_1)
+    var matrixRowLabels: [String]?
+
+    /// Column labels for matrix variables (from LABL_PTR_2)
+    var matrixColumnLabels: [String]?
+
     /// Total number of elements per record
     var totalElements: Int {
         if dimensions.isEmpty {
@@ -42,8 +48,11 @@ struct CDFVariable: Identifiable, Hashable {
     /// Whether each CDF record contains multiple displayable rows.
     /// This is true for 2D arrays like [N, 3] where N elements per record
     /// should each become a separate display row with 3 columns.
+    /// Note: Small matrices (≤10x10) are displayed as single rows with many columns.
     var hasMultipleRowsPerRecord: Bool {
-        return dimensions.count == 2 && dimensions[0] > 1
+        guard dimensions.count == 2 && dimensions[0] > 1 else { return false }
+        // Matrices are displayed as a single row with combined columns
+        return !isMatrix
     }
 
     /// Effective row count for display (accounts for arrays stored as single records)
@@ -65,6 +74,10 @@ struct CDFVariable: Identifiable, Hashable {
         if let size = vectorSize {
             return size
         }
+        if let dims = matrixDimensions {
+            // Matrices display all elements as columns (rows * cols)
+            return dims.rows * dims.cols
+        }
         if dimensions.isEmpty || dimensions == [1] {
             return 1
         }
@@ -72,10 +85,46 @@ struct CDFVariable: Identifiable, Hashable {
     }
 
     /// Whether this variable contains vector data (2D, 3D, 4D quaternion, etc.)
-    /// Vectors are defined as having a last dimension between 2 and 10.
+    /// Vectors are defined as 1D arrays with size between 2 and 10.
+    /// Note: 2D arrays are matrices, not vectors.
     var isVector: Bool {
-        guard let lastDim = dimensions.last else { return false }
+        guard dimensions.count == 1, let lastDim = dimensions.last else { return false }
         return lastDim >= 2 && lastDim <= 10
+    }
+
+    /// Whether this variable contains matrix data (2D array with small dimensions).
+    /// Matrices are defined as 2D arrays where both dimensions are between 2 and 10.
+    var isMatrix: Bool {
+        guard dimensions.count == 2 else { return false }
+        return dimensions[0] >= 2 && dimensions[0] <= 10 &&
+               dimensions[1] >= 2 && dimensions[1] <= 10
+    }
+
+    /// Matrix dimensions (rows, cols), or nil if not a matrix
+    var matrixDimensions: (rows: Int, cols: Int)? {
+        guard isMatrix else { return nil }
+        return (rows: dimensions[0], cols: dimensions[1])
+    }
+
+    /// Generate combined matrix labels (e.g., ["xx", "xy", "xz", "yx", ...])
+    /// Returns nil if not a matrix or if no real labels are available from LABL_PTR attributes
+    var combinedMatrixLabels: [String]? {
+        guard let dims = matrixDimensions else { return nil }
+
+        // Only generate combined labels if we have real labels from LABL_PTR
+        guard let rowLabels = matrixRowLabels, let colLabels = matrixColumnLabels,
+              rowLabels.count == dims.rows, colLabels.count == dims.cols else {
+            return nil
+        }
+
+        // Generate combined labels in row-major order
+        var labels: [String] = []
+        for row in 0..<dims.rows {
+            for col in 0..<dims.cols {
+                labels.append("\(rowLabels[row])\(colLabels[col])")
+            }
+        }
+        return labels
     }
 
     /// Size of the vector (number of components), or nil if not a vector
@@ -155,6 +204,8 @@ struct CDFVariable: Identifiable, Hashable {
             return "clock"
         } else if isECEFPosition || isECEFVelocity {
             return "globe"
+        } else if isMatrix {
+            return "square.grid.3x3"
         } else if isVector {
             return "arrow.up.right.and.arrow.down.left"
         } else if dataType == .char || dataType == .uchar {
@@ -243,6 +294,14 @@ struct CDFColumn: Identifiable {
             let names = componentNames(for: variable)
             return names.enumerated().map { i, name in
                 CDFColumn(id: i, name: name, dataType: variable.dataType, width: 120)
+            }
+        }
+
+        // Matrix variable: show with combined row/column labels
+        if let dims = variable.matrixDimensions {
+            let labels = variable.combinedMatrixLabels ?? (0..<(dims.rows * dims.cols)).map { "[\($0)]" }
+            return labels.enumerated().map { i, name in
+                CDFColumn(id: i, name: name, dataType: variable.dataType, width: 100)
             }
         }
 
