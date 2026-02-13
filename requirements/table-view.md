@@ -10,11 +10,19 @@ The primary view for exploring raw CDF data. Shows timestamps and selected varia
 - Sidebar shows variable list for selection
 - Chart and Globe views open as auxiliary windows
 
+### Independent Variable Section
+
+- Renamed from "Time Variable" to accommodate time-based and constant modes
+- Time variables shown as radio buttons with data type and record count
+- "Constants" pseudo-option available if file has time-independent variables
+- See `constants-view.md` for constants mode details
+
 ### Variable Selection
 
-- Single-select for time variable (used as row index)
+- Single-select for independent variable (time variable or constants mode)
 - Multi-select for data variables (each becomes a column)
 - Vector variables expand to X, Y, Z component columns
+- Data variables filtered based on DEPEND_* attributes matching selected time variable
 
 ### Timestamp Format
 
