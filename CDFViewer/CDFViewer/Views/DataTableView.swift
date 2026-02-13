@@ -7,14 +7,17 @@ struct DataTableView: View {
         VStack(spacing: 0) {
             if let error = viewModel.dataError {
                 ErrorBanner(error: error)
+            } else if viewModel.isShowingConstants {
+                // Constants mode: show grid of cards
+                ConstantsGridView(viewModel: viewModel)
             } else if viewModel.tableColumns.isEmpty {
                 ContentUnavailableView(
                     "No Data Selected",
                     systemImage: "tablecells",
-                    description: Text("Select a time variable and data variables from the sidebar")
+                    description: Text("Select an independent variable and data variables from the sidebar")
                 )
             } else {
-                // High-performance NSTableView for smooth scrolling
+                // Time-based mode: show table
                 DataTableNSView(viewModel: viewModel)
 
                 // Footer with stats
@@ -32,7 +35,8 @@ struct DataTableView: View {
                 } label: {
                     Label("Export CSV", systemImage: "square.and.arrow.up")
                 }
-                .disabled(viewModel.tableRowCount == 0)
+                .disabled(viewModel.tableRowCount == 0 || viewModel.isShowingConstants)
+                .help(viewModel.isShowingConstants ? "CSV export not available for constants" : "Export table data as CSV")
             }
         }
     }

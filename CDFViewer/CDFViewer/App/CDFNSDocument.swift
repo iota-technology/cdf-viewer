@@ -131,14 +131,16 @@ struct DocumentContentView: View {
                 } label: {
                     Label("Chart", systemImage: "chart.xyaxis.line")
                 }
-                .disabled(documentWrapper.viewModel.chartTimeVariable == nil)
+                .disabled(documentWrapper.viewModel.chartTimeVariable == nil || documentWrapper.viewModel.isShowingConstants)
+                .help(documentWrapper.viewModel.isShowingConstants ? "Chart requires a time-based independent variable" : "Open Time Series Chart")
 
                 Button {
                     openAuxiliaryWindow(id: "3D Globe")
                 } label: {
                     Label("Globe", systemImage: "globe")
                 }
-                .disabled(documentWrapper.document.cdfFile?.ecefPositionVariables().isEmpty ?? true)
+                .disabled(documentWrapper.document.cdfFile?.ecefPositionVariables().isEmpty ?? true || documentWrapper.viewModel.isShowingConstants)
+                .help(documentWrapper.viewModel.isShowingConstants ? "Globe requires a time-based independent variable" : "Open 3D Globe")
             }
         }
         .navigationTitle(documentWrapper.document.cdfFile?.fileName ?? "CDF Viewer")

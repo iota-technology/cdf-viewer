@@ -13,10 +13,24 @@ final class CDFViewModel {
     /// User overrides for variable metadata (colors, positional flag)
     var variableOverrides: [String: VariableMetadata] = [:]
 
-    // Table selection state (new multi-column approach)
-    var tableTimeVariable: CDFVariable? {
+    // Table selection state - independent variable can be a time variable or "Constants"
+    var tableIndependentSelection: IndependentVariableSelection? {
         didSet { loadTableData() }
     }
+
+    /// Computed property for the selected time variable (nil if showing constants)
+    var tableTimeVariable: CDFVariable? {
+        tableIndependentSelection?.timeVariable
+    }
+
+    /// Whether the table view is showing constants (time-independent data)
+    var isShowingConstants: Bool {
+        tableIndependentSelection?.isConstants ?? false
+    }
+
+    /// Loaded constant values for display in constants mode
+    private(set) var constantValues: [ConstantValue] = []
+
     var tableSelectedComponents: Set<String> = [] {  // "varName" or "varName.X"
         didSet {
             // Track newly added components as "loading"
@@ -165,14 +179,22 @@ final class CDFViewModel {
 
         // Auto-detect time variable for table and chart
         if let timeVar = file.timestampVariables().first {
-            tableTimeVariable = timeVar
+            tableIndependentSelection = .timeVariable(timeVar)
             chartTimeVariable = timeVar
-        }
-        // Auto-select first ECEF position variable's components
-        if let ecefVar = file.ecefPositionVariables().first {
-            let components = componentNames(for: ecefVar)
-            for comp in components {
-                tableSelectedComponents.insert("\(ecefVar.name).\(comp)")
+
+            // Auto-select first ECEF position variable's components
+            if let ecefVar = file.ecefPositionVariables().first {
+                let components = componentNames(for: ecefVar)
+                for comp in components {
+                    tableSelectedComponents.insert("\(ecefVar.name).\(comp)")
+                }
+            }
+        } else if file.hasConstants {
+            // No time variables, default to constants if available
+            tableIndependentSelection = .constants
+            // Select all constants by default
+            for variable in file.constantVariables() {
+                tableSelectedComponents.insert(variable.name)
             }
         }
     }
@@ -180,13 +202,35 @@ final class CDFViewModel {
     // MARK: - Table Data Loading
 
     private func loadTableData() {
-        guard let file = cdfFile,
-              let timeVar = tableTimeVariable else {
+        guard let file = cdfFile else {
+            tableColumns = []
+            allTimestamps = []
+            columnData = [:]
+            constantValues = []
+            return
+        }
+
+        // Handle constants mode
+        if isShowingConstants {
+            loadConstantsData()
+            // Clear time-based data
             tableColumns = []
             allTimestamps = []
             columnData = [:]
             return
         }
+
+        // Time-based mode requires a time variable
+        guard let timeVar = tableTimeVariable else {
+            tableColumns = []
+            allTimestamps = []
+            columnData = [:]
+            constantValues = []
+            return
+        }
+
+        // Clear constants data when in time-based mode
+        constantValues = []
 
         isLoadingData = true
         dataError = nil
@@ -300,6 +344,51 @@ final class CDFViewModel {
     /// Get component names for a vector variable
     private func componentNames(for variable: CDFVariable) -> [String] {
         return CDFColumn.componentNames(for: variable)
+    }
+
+    // MARK: - Constants Data Loading
+
+    /// Load constant values for display in constants mode
+    private func loadConstantsData() {
+        guard let file = cdfFile else {
+            constantValues = []
+            return
+        }
+
+        isLoadingData = true
+        dataError = nil
+
+        Task { @MainActor in
+            do {
+                var values: [ConstantValue] = []
+
+                for variable in file.constantVariables() {
+                    // Only load selected constants
+                    guard tableSelectedComponents.contains(variable.name) else { continue }
+
+                    let data = try file.readData(for: variable)
+                    values.append(ConstantValue(
+                        id: variable.name,
+                        variable: variable,
+                        values: data
+                    ))
+                }
+
+                self.constantValues = values
+                self.loadingComponents = []
+                isLoadingData = false
+            } catch let error as CDFError {
+                dataError = error
+                constantValues = []
+                loadingComponents = []
+                isLoadingData = false
+            } catch {
+                dataError = .corruptedData(error.localizedDescription)
+                constantValues = []
+                loadingComponents = []
+                isLoadingData = false
+            }
+        }
     }
 
     // MARK: - Chart Data

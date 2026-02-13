@@ -367,6 +367,37 @@ final class CDFFile: Identifiable {
         return variables.filter { $0.dataType.isNumeric && !$0.isTimestamp }
     }
 
+    /// Variables without any DEPEND_* attribute (time-independent constants).
+    /// These are numeric variables that don't depend on any time variable.
+    func constantVariables() -> [CDFVariable] {
+        let timeVarNames = Set(timestampVariables().map { $0.name })
+
+        return variables.filter { variable in
+            // Check if any DEPEND_* attribute references a time variable
+            let dependsOnTime = variable.attributes.contains { key, value in
+                key.hasPrefix("DEPEND_") && timeVarNames.contains(value)
+            }
+            return !dependsOnTime &&
+                   variable.dataType.isNumeric &&
+                   !variable.isTimestamp
+        }
+    }
+
+    /// Whether this file has any constant variables (time-independent data)
+    var hasConstants: Bool {
+        !constantVariables().isEmpty
+    }
+
+    /// Variables that depend on a specific time variable via any DEPEND_* attribute
+    func variablesDependingOn(timeVariable: CDFVariable) -> [CDFVariable] {
+        return variables.filter { variable in
+            // Check if any DEPEND_* attribute references this time variable
+            variable.attributes.contains { key, value in
+                key.hasPrefix("DEPEND_") && value == timeVariable.name
+            }
+        }
+    }
+
     // MARK: - Memory Management
 
     func clearCache() {

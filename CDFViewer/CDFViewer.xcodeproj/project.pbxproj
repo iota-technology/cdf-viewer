@@ -63,6 +63,10 @@
 		C10000080000000000000008 /* CDFVariable.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000090000000000000009 /* CDFVariable.swift */; };
 		C10000090000000000000009 /* CDFError.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000010000000000000000A /* CDFError.swift */; };
 		C1000010000000000000000A /* CDFQuickLook.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = C00000010000000000000001 /* CDFQuickLook.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		A100002D0000000000000027 /* IndependentVariableSelection.swift in Sources */ = {isa = PBXBuildFile; fileRef = A200002C0000000000000026 /* IndependentVariableSelection.swift */; };
+		A100002E0000000000000028 /* ConstantValue.swift in Sources */ = {isa = PBXBuildFile; fileRef = A200002D0000000000000027 /* ConstantValue.swift */; };
+		A100002F0000000000000029 /* ConstantCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = A200002E0000000000000028 /* ConstantCard.swift */; };
+		A10000400000000000000040 /* ConstantsGridView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A200002F0000000000000029 /* ConstantsGridView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -140,6 +144,10 @@
 		C20000010000000000000001 /* PreviewViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewViewController.swift; sourceTree = "<group>"; };
 		C20000020000000000000002 /* CDFPreviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CDFPreviewView.swift; sourceTree = "<group>"; };
 		C20000030000000000000003 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		A200002C0000000000000026 /* IndependentVariableSelection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IndependentVariableSelection.swift; sourceTree = "<group>"; };
+		A200002D0000000000000027 /* ConstantValue.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConstantValue.swift; sourceTree = "<group>"; };
+		A200002E0000000000000028 /* ConstantCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConstantCard.swift; sourceTree = "<group>"; };
+		A200002F0000000000000029 /* ConstantsGridView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConstantsGridView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -234,6 +242,8 @@
 				A20000290000000000000023 /* UnitNames.swift */,
 				A200002A0000000000000024 /* EarthMaterial.swift */,
 				A200002B0000000000000025 /* UpdaterController.swift */,
+				A200002C0000000000000026 /* IndependentVariableSelection.swift */,
+				A200002D0000000000000027 /* ConstantValue.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -252,6 +262,8 @@
 				A20000260000000000000020 /* VariableInfoPopover.swift */,
 				A20000270000000000000021 /* NavigationSidebarContainer.swift */,
 				A20000280000000000000022 /* CanvasLineChart.swift */,
+				A200002E0000000000000028 /* ConstantCard.swift */,
+				A200002F0000000000000029 /* ConstantsGridView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -414,6 +426,10 @@
 				A10000290000000000000023 /* UnitNames.swift in Sources */,
 				A100002A0000000000000024 /* EarthMaterial.swift in Sources */,
 				A100002C0000000000000026 /* UpdaterController.swift in Sources */,
+				A100002D0000000000000027 /* IndependentVariableSelection.swift in Sources */,
+				A100002E0000000000000028 /* ConstantValue.swift in Sources */,
+				A100002F0000000000000029 /* ConstantCard.swift in Sources */,
+				A10000400000000000000040 /* ConstantsGridView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
