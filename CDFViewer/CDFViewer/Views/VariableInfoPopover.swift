@@ -55,6 +55,19 @@ struct VariableInfoPopover: View {
             VStack(alignment: .leading, spacing: 6) {
                 DetailRow(label: "Type", value: variable.dataType.displayName)
                 DetailRow(label: "Dimensions", value: variable.dimensionString)
+
+                // Show dimension labels for vectors and matrices
+                if let labels = variable.componentLabels, !labels.isEmpty {
+                    DetailRow(label: "Labels", value: labels.joined(separator: ", "))
+                } else if variable.isMatrix {
+                    if let rowLabels = variable.matrixRowLabels {
+                        DetailRow(label: "Rows", value: rowLabels.joined(separator: ", "))
+                    }
+                    if let colLabels = variable.matrixColumnLabels {
+                        DetailRow(label: "Columns", value: colLabels.joined(separator: ", "))
+                    }
+                }
+
                 DetailRow(label: "Records", value: "\(variable.recordCount)")
 
                 // Show relevant CDF attributes
