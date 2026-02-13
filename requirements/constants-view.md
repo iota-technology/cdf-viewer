@@ -33,10 +33,9 @@ Display time-independent CDF variables (constants) that don't have a DEPEND_* at
 ### Unit Formatting
 Convert common unit patterns to proper symbols:
 - `^2` → `²`, `^3` → `³`, `^-1` → `⁻¹`
-- `degC` → `°C`, `degF` → `°F`, `deg` → `°`
-- `degK` → `K` (Kelvin uses no degree symbol)
 - `micro` → `µ`, `us` → `µs`
-- `rad` → `ᶜ` (superscript c for radians)
+
+Note: `deg` and `rad` are intentionally left as-is for clarity.
 
 ### Vector Display
 - Center-justified column with subtle square brackets

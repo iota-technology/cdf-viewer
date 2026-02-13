@@ -18,7 +18,7 @@ struct ConstantValue: Identifiable {
     /// Units from the UNITS attribute (e.g., "kg", "m/s")
     var units: String? { variable.units }
 
-    /// Formatted units with proper symbols (m² instead of m^2, ° instead of deg, etc.)
+    /// Formatted units with proper symbols (m² instead of m^2, µs instead of us, etc.)
     var formattedUnits: String? {
         guard let units = units else { return nil }
         return Self.formatUnits(units)
@@ -36,18 +36,9 @@ struct ConstantValue: Identifiable {
         result = result.replacingOccurrences(of: "^-2", with: "⁻²")
         result = result.replacingOccurrences(of: "^-3", with: "⁻³")
 
-        // Degree symbols - order matters (more specific first)
-        result = result.replacingOccurrences(of: "degC", with: "°C")
-        result = result.replacingOccurrences(of: "degF", with: "°F")
-        result = result.replacingOccurrences(of: "degK", with: "K")  // Kelvin doesn't use degree symbol
-        result = result.replacingOccurrences(of: "deg", with: "°")
-
         // Micro symbol (common patterns like us, uA, uV, um, etc.)
         result = result.replacingOccurrences(of: "micro", with: "µ")
         result = result.replacingOccurrences(of: "us", with: "µs")
-
-        // Radians
-        result = result.replacingOccurrences(of: "rad", with: "ᶜ")
 
         return result
     }
