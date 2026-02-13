@@ -51,6 +51,11 @@ class CDFNSDocument: NSDocument {
     }
 
     override func makeWindowControllers() {
+        // Add to recent documents list
+        if let url = fileURL {
+            NSDocumentController.shared.noteNewRecentDocumentURL(url)
+        }
+
         // Create SwiftUI view hosted in NSHostingController
         let contentView = DocumentContentView(document: self)
 

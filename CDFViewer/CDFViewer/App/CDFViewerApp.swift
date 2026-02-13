@@ -18,13 +18,14 @@ struct CDFViewerApp: App {
         .windowResizability(.contentSize)
         .defaultPosition(.center)
         .commands {
-            // Replace default New Document with Open
-            // Note: "Open Recent" is added via AppDelegate using native AppKit menu
+            // Replace default New Document with Open + Open Recent
             CommandGroup(replacing: .newItem) {
                 Button("Open...") {
                     NSDocumentController.shared.openDocument(nil)
                 }
                 .keyboardShortcut("o", modifiers: .command)
+
+                OpenRecentMenu()
             }
 
             // Custom About with clickable links
@@ -90,5 +91,35 @@ struct WelcomeView: View {
 
     private func openFile() {
         NSDocumentController.shared.openDocument(nil)
+    }
+}
+
+// MARK: - Open Recent Menu
+
+/// SwiftUI menu for recently opened documents
+struct OpenRecentMenu: View {
+    var body: some View {
+        Menu("Open Recent") {
+            let recentURLs = NSDocumentController.shared.recentDocumentURLs
+            if recentURLs.isEmpty {
+                Text("No Recent Items")
+                    .foregroundStyle(.secondary)
+            } else {
+                ForEach(recentURLs, id: \.self) { url in
+                    Button(url.lastPathComponent) {
+                        NSDocumentController.shared.openDocument(
+                            withContentsOf: url,
+                            display: true
+                        ) { _, _, _ in }
+                    }
+                }
+
+                Divider()
+
+                Button("Clear Menu") {
+                    NSDocumentController.shared.clearRecentDocuments(nil)
+                }
+            }
+        }
     }
 }

@@ -33,7 +33,24 @@ For release builds: `xcodebuild -scheme CDFViewer -configuration Release build`
    git push origin v1.0.0
    ```
 
-The workflow builds an unsigned app zip and creates a GitHub release using the tag message as release notes.
+The workflow builds, signs, notarizes, and creates a GitHub release with the stapled app.
+
+## Notarization Gotchas
+
+**Embedded frameworks need re-signing**: Xcode doesn't re-sign pre-signed embedded frameworks (like Sparkle) with your Developer ID certificate. You must manually re-sign all nested binaries with `--force --timestamp --options runtime` before notarization.
+
+**Sign innermost to outermost**: When re-signing nested bundles, sign in this order:
+
+1. XPC services (e.g., `Sparkle.framework/Versions/B/XPCServices/*.xpc`)
+2. Nested apps (e.g., `Sparkle.framework/Versions/B/Updater.app`)
+3. Standalone executables (e.g., `Sparkle.framework/Versions/B/Autoupdate`)
+4. The framework itself
+5. App extensions (e.g., `Contents/PlugIns/*.appex`)
+6. The main app bundle
+
+**Hardened runtime required**: All executables must have hardened runtime enabled (`--options runtime` in codesign). App extensions are easy to miss.
+
+**Secure timestamps required**: All signatures must include secure timestamps (`--timestamp` in codesign). Without this, notarization fails with "signature does not include a secure timestamp".
 
 ## Gotchas
 
@@ -284,6 +301,7 @@ var body: some View {
 ## CLAUDE.md Maintenance
 
 **Keep this file lean.** Only include:
+
 - Project-specific setup that isn't obvious from package.json/config files
 - Hard-won lessons from debugging (gotchas that caused real bugs)
 - User preferences for how Claude should work
@@ -291,6 +309,7 @@ var body: some View {
 **Don't include:** General language/framework knowledge, standard patterns, things discoverable from file structure.
 
 **Update this file** when you discover:
+
 - A non-obvious bug or gotcha that took debugging to figure out
 - A project-specific pattern that would save research time
 - New user preferences expressed during the conversation
