@@ -10,14 +10,14 @@ struct CDFViewerApp: App {
     private let updaterController = UpdaterController()
 
     var body: some Scene {
-        // Welcome window shown when no documents are open
-        WindowGroup(id: "welcome") {
-            WelcomeView()
+        // Welcome window is managed programmatically by AppDelegate
+        // so it only appears when no documents are open
+        Settings {
+            EmptyView()
         }
-        .windowStyle(.hiddenTitleBar)
-        .windowResizability(.contentSize)
-        .defaultPosition(.center)
         .commands {
+            // Remove Settings menu item (no settings to show)
+            CommandGroup(replacing: .appSettings) { }
             // Replace default New Document with Open + Open Recent
             CommandGroup(replacing: .newItem) {
                 Button("Open...") {

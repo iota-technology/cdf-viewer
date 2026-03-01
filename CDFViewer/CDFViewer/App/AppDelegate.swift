@@ -13,8 +13,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     /// Globe windows keyed by viewModel
     var globeWindows: [ObjectIdentifier: NSWindow] = [:]
 
-    /// Reference to the welcome window for programmatic control
-    private weak var welcomeWindow: NSWindow?
+    /// Welcome window managed programmatically (strong reference — we own it)
+    private var welcomeWindow: NSWindow?
 
     /// About window
     private var aboutWindow: NSWindow?
@@ -43,6 +43,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             name: NSWindow.willCloseNotification,
             object: nil
         )
+
+        // Show welcome window after a delay to allow file-open events to arrive first.
+        // When launched via double-clicking a file, the document opens before this fires.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            self?.showWelcomeWindowIfNeeded()
+        }
     }
 
     func applicationWillTerminate(_ notification: Notification) {
@@ -55,8 +61,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         if !flag {
-            // No visible windows, show open panel
-            NSDocumentController.shared.openDocument(nil)
+            // No visible windows, show welcome window
+            showWelcomeWindowIfNeeded()
         }
         return true
     }
@@ -66,14 +72,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func windowDidBecomeKey(_ notification: Notification) {
         guard let window = notification.object as? NSWindow else { return }
 
-        // If a document window became key, close the welcome window
+        // If a document window became key, hide the welcome window
         if window.windowController?.document is CDFNSDocument {
             closeWelcomeWindow()
-        }
-
-        // Track the welcome window for later reference
-        if window.identifier?.rawValue.contains("welcome") == true {
-            welcomeWindow = window
         }
     }
 
@@ -89,11 +90,24 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    private func createWelcomeWindow() {
+        let hostingController = NSHostingController(rootView: WelcomeView())
+
+        let window = NSWindow(contentViewController: hostingController)
+        window.setContentSize(NSSize(width: 400, height: 340))
+        window.styleMask = [.titled, .closable, .fullSizeContentView]
+        window.titlebarAppearsTransparent = true
+        window.titleVisibility = .hidden
+        window.isMovableByWindowBackground = true
+        window.isReleasedWhenClosed = false
+        window.isExcludedFromWindowsMenu = true
+        window.center()
+
+        welcomeWindow = window
+    }
+
     private func closeWelcomeWindow() {
-        // Find and close all welcome windows
-        for window in NSApp.windows where window.identifier?.rawValue.contains("welcome") == true {
-            window.close()
-        }
+        welcomeWindow?.orderOut(nil)
     }
 
     private func showWelcomeWindowIfNeeded() {
@@ -103,10 +117,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         if !hasDocumentWindows {
-            // No document windows open, show welcome window if it exists
-            if let window = welcomeWindow {
-                window.makeKeyAndOrderFront(nil)
+            if welcomeWindow == nil {
+                createWelcomeWindow()
             }
+            welcomeWindow?.makeKeyAndOrderFront(nil)
         }
     }
 
