@@ -35,6 +35,10 @@ For release builds: `xcodebuild -scheme CDFViewer -configuration Release build`
 
 The workflow builds, signs, notarizes, and creates a GitHub release with the stapled app.
 
+## Sparkle Gotchas
+
+**`sign_update` requires raw key format**: Sparkle's `sign_update` tool does NOT accept PEM-encoded keys. It expects the raw base64-encoded Ed25519 seed (32 bytes). Convert PEM to Sparkle format with: `openssl pkey -in key.pem -outform DER | tail -c 32 | base64`. An empty `sparkle:edSignature=""` in the appcast is the symptom of this mismatch.
+
 ## Notarization Gotchas
 
 **Embedded frameworks need re-signing**: Xcode doesn't re-sign pre-signed embedded frameworks (like Sparkle) with your Developer ID certificate. You must manually re-sign all nested binaries with `--force --timestamp --options runtime` before notarization.

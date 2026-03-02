@@ -211,20 +211,24 @@ jobs:
         env:
           SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
         run: |
-          # Write private key to temp file
+          # Write PEM private key to temp file
           echo "$SPARKLE_PRIVATE_KEY" > /tmp/sparkle_private.pem
+
+          # Convert PEM to Sparkle's raw base64 seed format
+          # (sign_update expects raw Ed25519 seed, not PEM-wrapped PKCS8)
+          openssl pkey -in /tmp/sparkle_private.pem -outform DER 2>/dev/null | tail -c 32 | base64 > /tmp/sparkle_key.txt
 
           # Get file size
           FILE_SIZE=$(stat -f%z CDFViewer/build/Export/CDFViewer-${{ steps.version.outputs.version }}.zip)
 
           # Sign the zip file with EdDSA
-          SIGNATURE=$(sparkle-tools/bin/sign_update CDFViewer/build/Export/CDFViewer-${{ steps.version.outputs.version }}.zip --ed-key-file /tmp/sparkle_private.pem | grep "sparkle:edSignature" | sed 's/.*sparkle:edSignature="\([^"]*\)".*/\1/')
+          SIGNATURE=$(sparkle-tools/bin/sign_update CDFViewer/build/Export/CDFViewer-${{ steps.version.outputs.version }}.zip --ed-key-file /tmp/sparkle_key.txt | grep "sparkle:edSignature" | sed 's/.*sparkle:edSignature="\([^"]*\)".*/\1/')
 
           echo "signature=$SIGNATURE" >> $GITHUB_OUTPUT
           echo "file_size=$FILE_SIZE" >> $GITHUB_OUTPUT
 
           # Clean up
-          rm /tmp/sparkle_private.pem
+          rm /tmp/sparkle_private.pem /tmp/sparkle_key.txt
 
       - name: Generate appcast
         run: |
