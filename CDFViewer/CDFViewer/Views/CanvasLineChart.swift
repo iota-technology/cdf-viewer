@@ -224,8 +224,10 @@ struct CanvasLineChart: View {
         var lastShownDateString: String? = nil
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyy-MM-dd"
+        dateFormatter.timeZone = TimeZone(identifier: "UTC")
 
         let timeFormatter = DateFormatter()
+        timeFormatter.timeZone = TimeZone(identifier: "UTC")
         switch precision {
         case .hourMinute:
             timeFormatter.dateFormat = "HH:mm"

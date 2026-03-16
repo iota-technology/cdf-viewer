@@ -92,6 +92,7 @@ struct DataTableNSView: NSViewRepresentable {
         private let timestampFormatter: DateFormatter = {
             let f = DateFormatter()
             f.dateFormat = "yyyy-MM-dd HH:mm:ss.SSS"
+            f.timeZone = TimeZone(identifier: "UTC")
             return f
         }()
 

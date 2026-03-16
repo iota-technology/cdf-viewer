@@ -11,6 +11,7 @@ struct TimeSeriesChartView: View {
     private static let timeWithMillisFormatter: DateFormatter = {
         let f = DateFormatter()
         f.dateFormat = "HH:mm:ss.SSS"
+        f.timeZone = TimeZone(identifier: "UTC")
         return f
     }()
 
@@ -74,7 +75,7 @@ struct TimeSeriesChartView: View {
                 if selectedTimeVariable == variable, let date = activeDate {
                     HStack(alignment: .top, spacing: 4) {
                         VStack(alignment: .trailing, spacing: 1) {
-                            Text(date, format: .dateTime.year().month().day())
+                            Text(date, format: Date.FormatStyle(timeZone: .gmt).year().month().day())
                                 .font(.system(size: 10, design: .monospaced))
                                 .foregroundStyle(.secondary)
                             Text(Self.timeWithMillisFormatter.string(from: date))

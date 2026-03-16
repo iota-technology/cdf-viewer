@@ -200,7 +200,7 @@ struct GlobeView: View {
                 // Show timestamp for selected time variable
                 if selectedTimeVariable == variable, let date = currentTimestamp {
                     HStack(spacing: 4) {
-                        Text(date, format: .dateTime.month().day().hour().minute().second())
+                        Text(date, format: Date.FormatStyle(timeZone: .gmt).month().day().hour().minute().second())
                             .font(.system(size: 11, design: .monospaced))
                             .foregroundStyle(.secondary)
                         if viewModel.isCursorPaused && !viewModel.isAnimating {
@@ -296,7 +296,7 @@ struct GlobeView: View {
             VStack(spacing: 8) {
                 // Timestamp display
                 if let currentDate = currentTimestamp {
-                    Text(currentDate, format: .dateTime.year().month().day().hour().minute())
+                    Text(currentDate, format: Date.FormatStyle(timeZone: .gmt).year().month().day().hour().minute())
                         .font(.system(size: 18, weight: .medium).monospacedDigit())
                         .foregroundStyle(.white)
                         .shadow(color: .black, radius: 2)
