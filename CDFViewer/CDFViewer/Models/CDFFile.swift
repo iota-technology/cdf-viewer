@@ -319,48 +319,56 @@ final class CDFFile: Identifiable {
         return try reader.readVariableDoubles(variable)
     }
 
-    /// Read timestamps as Unix seconds
+    /// Read timestamps as Unix seconds (optimized — uses direct double path, skips CDFValue boxing)
     func readTimestamps(for variable: CDFVariable) throws -> [Double] {
-        let values = try readData(for: variable)
+        // Use the fast direct-double path and apply the epoch conversion in bulk
+        var doubles = try reader.readVariableDoubles(variable)
 
         // CDF EPOCH offset: milliseconds from year 0 AD to Unix epoch (1970)
         let epochToUnixMs = 62167219200000.0
         // J2000 in Unix time (2000-01-01 12:00:00 TT)
         let j2000Unix = 946728000.0
 
-        return values.compactMap { value -> Double? in
-            switch value {
-            case .epoch(let v):
-                // CDF_EPOCH: milliseconds since 0 AD
-                return (v - epochToUnixMs) / 1000.0
-
-            case .epoch16(let v, _):
-                // CDF_EPOCH16: first double is milliseconds since 0 AD
-                return (v - epochToUnixMs) / 1000.0
-
-            case .timeTT2000(let v):
-                // CDF_TIME_TT2000: nanoseconds since J2000
-                return j2000Unix + Double(v) / 1e9
-
-            case .float64(let v):
-                // Regular double - assume Unix seconds
-                return v
-
-            case .float32(let v):
-                return Double(v)
-
-            case .int64(let v):
-                // Regular int64 - assume milliseconds since Unix epoch
-                return Double(v) / 1000.0
-
-            case .unixTimestamp(let v):
-                // Unix timestamp in microseconds -> convert to seconds
-                return Double(v) / 1_000_000.0
-
-            default:
-                return nil
+        switch variable.dataType {
+        case .epoch:
+            // CDF_EPOCH: milliseconds since 0 AD -> Unix seconds
+            for i in doubles.indices {
+                doubles[i] = (doubles[i] - epochToUnixMs) / 1000.0
             }
+
+        case .epoch16:
+            // CDF_EPOCH16: decodeDoublesDirectly already extracts first double (ms since 0 AD)
+            for i in doubles.indices {
+                doubles[i] = (doubles[i] - epochToUnixMs) / 1000.0
+            }
+
+        case .timeTT2000:
+            // CDF_TIME_TT2000: raw value is nanoseconds since J2000 (as Double from Int64)
+            for i in doubles.indices {
+                doubles[i] = j2000Unix + doubles[i] / 1e9
+            }
+
+        case .int8:
+            // Regular int64 - check if this should be a unix timestamp
+            if parserOptions.treatInt64TimestampAsUnixMicroseconds &&
+               variable.name.lowercased().hasPrefix("timestamp") {
+                // Unix timestamp in microseconds -> seconds
+                for i in doubles.indices {
+                    doubles[i] = doubles[i] / 1_000_000.0
+                }
+            } else {
+                // Assume milliseconds since Unix epoch
+                for i in doubles.indices {
+                    doubles[i] = doubles[i] / 1000.0
+                }
+            }
+
+        default:
+            // float64/float32: assume Unix seconds already
+            break
         }
+
+        return doubles
     }
 
     /// Read ECEF positions as (x, y, z) tuples in meters

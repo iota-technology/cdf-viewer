@@ -191,4 +191,5 @@ final class CDFParserTests: XCTestCase {
 
         // The file is IBMPC encoded (little-endian), so LE should give sensible values
     }
+
 }

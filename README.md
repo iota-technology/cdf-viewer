@@ -24,11 +24,6 @@ A native macOS app for viewing NASA CDF (Common Data Format) files. Built with S
 
 Download the latest release from the [Releases](https://github.com/iota-technology/cdf-viewer/releases) page.
 
-> **Note**: The app is unsigned. After downloading, you may need to run:
-> ```bash
-> xattr -cr /path/to/CDFViewer.app
-> ```
-
 ## Building from Source
 
 ```bash
@@ -39,11 +34,12 @@ open ~/Library/Developer/Xcode/DerivedData/CDFViewer-*/Build/Products/Release/CD
 
 ## Supported CDF Features
 
-- CDF version 3.x files
-- GZIP-compressed variable records (CVVR)
-- Data types: INT8, DOUBLE, EPOCH, TT2000, CHAR
+- CDF version 3.x files (single-file format)
+- GZIP-compressed variable records (CVVR) with multi-level VXR index trees
+- All standard data types: INT1/2/4/8, UINT1/2/4, FLOAT, DOUBLE, EPOCH, EPOCH16, TT2000, CHAR
 - Row-major and column-major formats
-- zVariables with multi-dimensional arrays
+- zVariables and rVariables with multi-dimensional arrays
+- ISTP metadata conventions (DEPEND_0/1/2, LABL_PTR_*, VAR_TYPE, DISPLAY_TYPE)
 
 ## License
 

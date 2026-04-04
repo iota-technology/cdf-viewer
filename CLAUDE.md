@@ -140,6 +140,10 @@ Chart {
 }
 ```
 
+**CDF VXR index trees**: Large CDF files (100K+ records) use a multi-level tree of VXR (Variable Index Records), not just a flat linked list. Each VXR entry can point to either a data record (VVR/CVVR) or another sub-VXR node. The parser must recurse into sub-VXR entries — if you only follow `vxrNext` pointers you'll silently get zero data. This is especially common with ISTP-compliant files that use large blocking factors.
+
+**CDF performance — avoid CDFValue boxing for numeric data**: The `readVariableDoubles` and `readTimestamps` hot paths should use `decodeDoublesDirectly` (bulk `withUnsafeBytes` reinterpretation) rather than going through `readVariableData` → `[CDFValue]` → `.doubleValue`. Boxing millions of values into enum cases and immediately unboxing them costs ~3x in wall time.
+
 **Xcode project file structure**: When adding new Swift files to an Xcode project, you need to add entries in FOUR places in `project.pbxproj`:
 
 1. `PBXBuildFile` section - references the file for compilation

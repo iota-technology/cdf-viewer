@@ -217,18 +217,14 @@ final class CDFReader {
 
     /// Read all data for a variable
     func readVariableData(_ variable: CDFVariable) throws -> [CDFValue] {
-        guard variable.vxrOffset > 0 else {
-            return []
-        }
+        let rawData = try readRawBytes(for: variable)
+        return try decodeData(rawData, variable: variable)
+    }
 
-        // Check cache
-        if let cached = cacheQueue.sync(execute: { dataCache[variable.name] }) {
-            return try decodeData(cached, variable: variable)
-        }
-
-        // Read VXR chain
-        var allData = Data()
-        var vxrOffset = variable.vxrOffset
+    /// Recursively read data from a VXR tree. Each VXR entry can point to either
+    /// a data record (VVR/CVVR) or another VXR sub-index node.
+    private func readVXRTree(offset: Int64, variable: CDFVariable, into allData: inout Data) throws {
+        var vxrOffset = offset
 
         while vxrOffset > 0 {
             reader.seek(to: vxrOffset)
@@ -241,14 +237,17 @@ final class CDFReader {
                 reader.seek(to: entry.offset)
 
                 // Peek at record type
-                guard let recordSize = reader.readInt64(),
+                guard let _ = reader.readInt64(),
                       let recordTypeRaw = reader.readInt32() else {
                     throw CDFError.dataReadFailed(variable: variable.name, reason: "Cannot read record header")
                 }
 
                 reader.seek(to: entry.offset)
 
-                if recordTypeRaw == CDFRecordType.vvr.rawValue {
+                if recordTypeRaw == CDFRecordType.vxr.rawValue {
+                    // Sub-index VXR node — recurse into it
+                    try readVXRTree(offset: entry.offset, variable: variable, into: &allData)
+                } else if recordTypeRaw == CDFRecordType.vvr.rawValue {
                     // Uncompressed VVR
                     guard let vvr = VariableValuesRecord(reader: reader) else {
                         throw CDFError.dataReadFailed(variable: variable.name, reason: "Invalid VVR")
@@ -283,11 +282,6 @@ final class CDFReader {
 
             vxrOffset = vxr.vxrNext
         }
-
-        // Cache the data
-        cacheQueue.sync { dataCache[variable.name] = allData }
-
-        return try decodeData(allData, variable: variable)
     }
 
     /// Read a range of records for lazy loading
@@ -304,10 +298,10 @@ final class CDFReader {
         return Array(allData[startIndex..<endIndex])
     }
 
-    /// Read raw doubles for a variable (optimized path for numeric data)
+    /// Read raw doubles for a variable (optimized path — skips CDFValue boxing)
     func readVariableDoubles(_ variable: CDFVariable) throws -> [Double] {
-        let values = try readVariableData(variable)
-        return values.compactMap { $0.doubleValue }
+        let rawData = try readRawBytes(for: variable)
+        return decodeDoublesDirectly(rawData, dataType: variable.dataType)
     }
 
     /// Read raw Int64s for a variable (optimized for timestamps)
@@ -319,6 +313,189 @@ final class CDFReader {
             case .timeTT2000(let v): return v
             default: return nil
             }
+        }
+    }
+
+    // MARK: - Raw Byte Reading (shared between CDFValue and direct-double paths)
+
+    /// Read raw bytes for a variable, using cache. Shared by readVariableData and readVariableDoubles.
+    private func readRawBytes(for variable: CDFVariable) throws -> Data {
+        guard variable.vxrOffset > 0 else { return Data() }
+
+        if let cached = cacheQueue.sync(execute: { dataCache[variable.name] }) {
+            return cached
+        }
+
+        var allData = Data()
+        try readVXRTree(offset: variable.vxrOffset, variable: variable, into: &allData)
+        cacheQueue.sync { dataCache[variable.name] = allData }
+        return allData
+    }
+
+    /// Bulk-convert raw bytes to [Double] without creating intermediate CDFValue enums.
+    /// This is the hot path for chart/table display — avoids millions of heap allocations.
+    private func decodeDoublesDirectly(_ data: Data, dataType: CDFDataType) -> [Double] {
+        let byteSize = dataType.byteSize
+        guard byteSize > 0 else { return [] }
+        let count = data.count / byteSize
+
+        // Fast path: if data endianness matches platform and type is float64/epoch,
+        // we can reinterpret the bytes directly
+        let platformIsLittleEndian = true  // macOS is always little-endian
+        let canReinterpret = dataIsLittleEndian == platformIsLittleEndian
+
+        switch dataType {
+        case .real8, .double, .epoch:
+            if canReinterpret {
+                return data.withUnsafeBytes { buffer in
+                    let typed = buffer.bindMemory(to: Double.self)
+                    return Array(typed.prefix(count))
+                }
+            } else {
+                var result = [Double]()
+                result.reserveCapacity(count)
+                let reader = CDFBinaryReader(data: data)
+                reader.setEndianness(dataIsLittleEndian)
+                for _ in 0..<count {
+                    guard let v = reader.readFloat64() else { break }
+                    result.append(v)
+                }
+                return result
+            }
+
+        case .real4, .float:
+            if canReinterpret {
+                return data.withUnsafeBytes { buffer in
+                    let typed = buffer.bindMemory(to: Float.self)
+                    return typed.prefix(count).map { Double($0) }
+                }
+            } else {
+                var result = [Double]()
+                result.reserveCapacity(count)
+                let reader = CDFBinaryReader(data: data)
+                reader.setEndianness(dataIsLittleEndian)
+                for _ in 0..<count {
+                    guard let v = reader.readFloat32() else { break }
+                    result.append(Double(v))
+                }
+                return result
+            }
+
+        case .int8:
+            var result = [Double]()
+            result.reserveCapacity(count)
+            if canReinterpret {
+                data.withUnsafeBytes { buffer in
+                    let typed = buffer.bindMemory(to: Int64.self)
+                    for v in typed.prefix(count) { result.append(Double(v)) }
+                }
+            } else {
+                let reader = CDFBinaryReader(data: data)
+                reader.setEndianness(dataIsLittleEndian)
+                for _ in 0..<count {
+                    guard let v = reader.readInt64() else { break }
+                    result.append(Double(v))
+                }
+            }
+            return result
+
+        case .timeTT2000:
+            var result = [Double]()
+            result.reserveCapacity(count)
+            if canReinterpret {
+                data.withUnsafeBytes { buffer in
+                    let typed = buffer.bindMemory(to: Int64.self)
+                    for v in typed.prefix(count) { result.append(Double(v)) }
+                }
+            } else {
+                let reader = CDFBinaryReader(data: data)
+                reader.setEndianness(dataIsLittleEndian)
+                for _ in 0..<count {
+                    guard let v = reader.readInt64() else { break }
+                    result.append(Double(v))
+                }
+            }
+            return result
+
+        case .int4:
+            var result = [Double]()
+            result.reserveCapacity(count)
+            if canReinterpret {
+                data.withUnsafeBytes { buffer in
+                    let typed = buffer.bindMemory(to: Int32.self)
+                    for v in typed.prefix(count) { result.append(Double(v)) }
+                }
+            } else {
+                let reader = CDFBinaryReader(data: data)
+                reader.setEndianness(dataIsLittleEndian)
+                for _ in 0..<count {
+                    guard let v = reader.readInt32() else { break }
+                    result.append(Double(v))
+                }
+            }
+            return result
+
+        case .uint4:
+            var result = [Double]()
+            result.reserveCapacity(count)
+            if canReinterpret {
+                data.withUnsafeBytes { buffer in
+                    let typed = buffer.bindMemory(to: UInt32.self)
+                    for v in typed.prefix(count) { result.append(Double(v)) }
+                }
+            } else {
+                let reader = CDFBinaryReader(data: data)
+                reader.setEndianness(dataIsLittleEndian)
+                for _ in 0..<count {
+                    guard let v = reader.readUInt32() else { break }
+                    result.append(Double(v))
+                }
+            }
+            return result
+
+        case .uint1:
+            return data.prefix(count).map { Double($0) }
+
+        case .int1:
+            return data.prefix(count).map { Double(Int8(bitPattern: $0)) }
+
+        case .int2:
+            var result = [Double]()
+            result.reserveCapacity(count)
+            let reader = CDFBinaryReader(data: data)
+            reader.setEndianness(dataIsLittleEndian)
+            for _ in 0..<count {
+                guard let v = reader.readInt16() else { break }
+                result.append(Double(v))
+            }
+            return result
+
+        case .uint2:
+            var result = [Double]()
+            result.reserveCapacity(count)
+            let reader = CDFBinaryReader(data: data)
+            reader.setEndianness(dataIsLittleEndian)
+            for _ in 0..<count {
+                guard let v = reader.readUInt16() else { break }
+                result.append(Double(v))
+            }
+            return result
+
+        case .epoch16:
+            // Two doubles per value — return just the first (milliseconds)
+            var result = [Double]()
+            result.reserveCapacity(count / 2)
+            let reader = CDFBinaryReader(data: data)
+            reader.setEndianness(dataIsLittleEndian)
+            for _ in 0..<(data.count / 16) {
+                guard let v1 = reader.readFloat64() else { break }
+                _ = reader.readFloat64()  // skip picoseconds
+                result.append(v1)
+            }
+            return result
+
+        case .char, .uchar:
+            return []  // Not numeric
         }
     }
 
