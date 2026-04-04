@@ -44,6 +44,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             object: nil
         )
 
+        // Close any spurious windows created by SwiftUI's Settings scene on macOS 15+.
+        // The Settings scene auto-opens on launch in Tahoe; we close it immediately.
+        closeSpuriousSettingsWindows()
+
         // Show welcome window after a delay to allow file-open events to arrive first.
         // When launched via double-clicking a file, the document opens before this fires.
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
@@ -65,6 +69,27 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             showWelcomeWindowIfNeeded()
         }
         return true
+    }
+
+    // MARK: - Spurious Settings Window Cleanup
+
+    /// On macOS 15+ (Tahoe), SwiftUI's Settings scene creates a visible window on launch
+    /// even though we replace the Settings menu item. Close any non-document, non-welcome
+    /// windows that SwiftUI created before we had a chance to intervene.
+    private func closeSpuriousSettingsWindows() {
+        for window in NSApp.windows {
+            // Skip windows we manage
+            if window == welcomeWindow { continue }
+            if window == aboutWindow { continue }
+            if window.windowController?.document is CDFNSDocument { continue }
+            if chartWindows.values.contains(window) { continue }
+            if globeWindows.values.contains(window) { continue }
+
+            // Any remaining visible window is spurious (e.g. Settings)
+            if window.isVisible {
+                window.orderOut(nil)
+            }
+        }
     }
 
     // MARK: - Welcome Window Management

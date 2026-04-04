@@ -10,8 +10,10 @@ struct CDFViewerApp: App {
     private let updaterController = UpdaterController()
 
     var body: some Scene {
-        // Welcome window is managed programmatically by AppDelegate
-        // so it only appears when no documents are open
+        // All windows are managed programmatically by AppDelegate / NSDocument.
+        // We need a scene solely to host menu commands.
+        // On macOS 15+ (Tahoe), Settings scenes auto-open on launch, so we
+        // close the spurious window in AppDelegate.applicationDidFinishLaunching.
         Settings {
             EmptyView()
         }
